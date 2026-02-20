@@ -2,3 +2,4 @@ microlearning.db
 uploads
 myenv
 __pycache__
+.env

@@ -13,6 +13,7 @@ Run with:
 import os
 import json
 import uuid
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
@@ -65,34 +66,29 @@ def on_startup():
     - Initializes the SQLite database tables.
     """
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"[STARTUP] Upload directory ready: {UPLOAD_DIR.resolve()}")
+    print(f"[STARTUP] Upload directory ready: {UPLOAD_DIR.resolve()}", flush=True)
     init_db()
-    print("[STARTUP] Server is ready.")
+    print("[STARTUP] Server is ready.", flush=True)
 
 
 # ---------------------------------------------------------------------------
 # Background task – extract text and generate script
 # ---------------------------------------------------------------------------
-def process_file(file_id: int, filepath: str):
+def process_file_sync(file_id: int, filepath: str):
     """
-    Background task that runs after a file is uploaded.
-
-    Steps:
-        1. Extract text from the uploaded file.
-        2. Call Gemini AI to generate a micro-learning script.
-        3. Update the database with the script or mark as failed.
+    Synchronous wrapper for the background task to ensure execution in threadpool.
     """
-    print(f"[BACKGROUND] Processing file {file_id}: {filepath}")
-
+    print(f"[BACKGROUND] process_file_sync STARTED for file {file_id}: {filepath}", flush=True)
     try:
         # Step 1: Extract text
+        print(f"[BACKGROUND] Extracting text for file {file_id}...", flush=True)
         text = extract_text(filepath)
         if not text or not text.strip():
-            print(f"[BACKGROUND] No text extracted from file {file_id}.")
+            print(f"[BACKGROUND] No text extracted from file {file_id}.", flush=True)
             update_file_status(file_id, "script_failed")
             return
 
-        print(f"[BACKGROUND] Extracted {len(text)} characters from file {file_id}.")
+        print(f"[BACKGROUND] Extracted {len(text)} characters from file {file_id}. Sending to Gemini...", flush=True)
 
         # Step 2: Generate script using Gemini
         script = generate_script(text)
@@ -101,15 +97,19 @@ def process_file(file_id: int, filepath: str):
             # Step 3a: Success – store the script as JSON
             script_json_str = json.dumps(script, ensure_ascii=False)
             update_file_status(file_id, "script_ready", script_json=script_json_str)
-            print(f"[BACKGROUND] Script generated and saved for file {file_id}.")
+            print(f"[BACKGROUND] Script generated and saved successfully for file {file_id}!", flush=True)
         else:
             # Step 3b: Failure – mark as failed
             update_file_status(file_id, "script_failed")
-            print(f"[BACKGROUND] Script generation failed for file {file_id}.")
+            print(f"[BACKGROUND] Script generation returned None for file {file_id}.", flush=True)
 
     except Exception as e:
-        print(f"[BACKGROUND] ERROR processing file {file_id}: {e}")
+        print(f"[BACKGROUND] ERROR processing file {file_id}: {e}", flush=True)
         update_file_status(file_id, "script_failed")
+        import traceback
+        traceback.print_exc()
+        
+    print(f"[BACKGROUND] process_file_sync FINISHED for file {file_id}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -119,23 +119,15 @@ def process_file(file_id: int, filepath: str):
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """
     Accept a .txt or .pdf file upload and trigger background processing.
-
-    Steps:
-        1. Validate the file extension.
-        2. Generate a unique filename using UUID (preserves original extension).
-        3. Save the file to the uploads directory.
-        4. Insert a record into the 'files' database table.
-        5. Set status to 'processing' and trigger background task.
-        6. Return file metadata immediately.
-
-    Raises:
-        HTTPException 400 – If the file type is not .txt or .pdf.
     """
+    print(f"\n[UPLOAD] --- New upload request received: {file.filename} ---", flush=True)
+
     # --- Step 1: Validate file extension ---
     original_filename = file.filename or "unknown"
     file_extension = Path(original_filename).suffix.lower()
 
     if file_extension not in ALLOWED_EXTENSIONS:
+        print(f"[UPLOAD] Invalid file extension: {file_extension}", flush=True)
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type '{file_extension}'. Only .txt and .pdf files are allowed.",
@@ -150,19 +142,24 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
     with open(file_path, "wb") as f:
         f.write(contents)
 
-    print(f"[UPLOAD] Saved file: {file_path}  (original: {original_filename})")
+    print(f"[UPLOAD] Saved file to disk: {file_path}", flush=True)
 
     # --- Step 4: Insert record into the database ---
     file_id = insert_file(
         filename=unique_filename,
         original_filename=original_filename,
     )
+    print(f"[UPLOAD] Saved initial DB record with file_id: {file_id}. Status is currently 'uploaded'.", flush=True)
 
     # --- Step 5: Set status to 'processing' and trigger background task ---
+    print(f"[UPLOAD] Updating status to 'processing' for file_id {file_id}...", flush=True)
     update_file_status(file_id, "processing")
-    background_tasks.add_task(process_file, file_id, str(file_path))
+    
+    print(f"[UPLOAD] Queueing background task for file_id {file_id}...", flush=True)
+    background_tasks.add_task(process_file_sync, file_id, str(file_path))
 
     # --- Step 6: Return response immediately ---
+    print(f"[UPLOAD] Returning success response to client for file_id {file_id}...\n", flush=True)
     return {
         "file_id": file_id,
         "filename": original_filename,
@@ -190,9 +187,6 @@ def list_files():
 def file_status(file_id: int):
     """
     Return the status of a specific file, its generated script, and any associated videos.
-
-    Raises:
-        HTTPException 404 – If no file with the given ID exists.
     """
     # Look up the file record
     file_record = get_file_by_id(file_id)
