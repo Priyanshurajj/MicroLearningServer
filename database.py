@@ -3,6 +3,8 @@ database.py - SQLite database setup and helper functions.
 
 Uses Python's built-in sqlite3 module (no ORM).
 Database file is stored as 'microlearning.db' in the project root.
+
+Day 2: Added script_json column and update_file_status helper.
 """
 
 import sqlite3
@@ -57,6 +59,14 @@ def init_db() -> None:
             FOREIGN KEY (file_id) REFERENCES files(id)
         )
     """)
+
+    # Day 2: Add script_json column if it doesn't already exist
+    try:
+        cursor.execute("ALTER TABLE files ADD COLUMN script_json TEXT")
+        print("[DB] Added 'script_json' column to files table.")
+    except sqlite3.OperationalError:
+        # Column already exists — safe to ignore
+        pass
 
     conn.commit()
     conn.close()
@@ -127,3 +137,34 @@ def get_videos_by_file_id(file_id: int) -> list[dict]:
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Helper functions – File status updates (Day 2)
+# ---------------------------------------------------------------------------
+def update_file_status(file_id: int, status: str, script_json: str | None = None) -> None:
+    """
+    Update the status (and optionally the script_json) of a file record.
+
+    Args:
+        file_id: The ID of the file to update.
+        status: New status string (e.g. 'processing', 'script_ready', 'script_failed').
+        script_json: Optional JSON string of the generated script.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if script_json is not None:
+        cursor.execute(
+            "UPDATE files SET status = ?, script_json = ? WHERE id = ?",
+            (status, script_json, file_id),
+        )
+    else:
+        cursor.execute(
+            "UPDATE files SET status = ? WHERE id = ?",
+            (status, file_id),
+        )
+
+    conn.commit()
+    conn.close()
+    print(f"[DB] File {file_id} status updated to '{status}'.")
