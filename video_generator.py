@@ -1,13 +1,13 @@
 """
 video_generator.py - Animated video generation using Manim Community Edition.
 
-Creates a vertical (1080×1920) animated MP4 video where each slide features:
+Creates a vertical (1080x1920) animated MP4 video where each slide features:
     - Dark gradient background
     - Animated title (Write effect)
     - Decorative accent bar
     - Animated content text (FadeIn effect)
     - Slide number indicator
-    - Smooth fade transitions between slides
+    - Duration-matched to per-slide audio for perfect sync
 
 Audio is composed onto the video using MoviePy after Manim rendering.
 
@@ -48,7 +48,6 @@ from manim import (
 from moviepy import (
     VideoFileClip,
     AudioFileClip,
-    CompositeAudioClip,
 )
 
 
@@ -63,13 +62,21 @@ ACCENT_COLOR = "#e94560"
 ACCENT_SECONDARY = "#0f3460"
 TITLE_COLOR = "#ffffff"
 CONTENT_COLOR = "#e0e0e8"
-SLIDE_HOLD_DURATION = 4     # Seconds to hold each slide (excluding animation time)
+
+# Animation timing (these are subtracted from total slide duration to get hold time)
+ANIM_IN_TIME = 1.5     # Title write + accent bar + content fade in
+ANIM_OUT_TIME = 0.5    # Fade out
+INTER_SLIDE_GAP = 0.2  # Pause between slides
+MIN_HOLD_TIME = 1.0    # Minimum time to hold a slide on screen
 
 
-def _build_scene_class(slides: list):
+def _build_scene_class(slides: list, slide_durations: list[float]):
     """
-    Dynamically construct a Manim Scene class for the given slides.
-    Returns the class (not an instance).
+    Dynamically construct a Manim Scene class with duration-matched slides.
+
+    Args:
+        slides: List of slide dicts with 'title' and 'content'.
+        slide_durations: Per-slide audio durations in seconds.
     """
 
     class MicroLearningScene(Scene):
@@ -79,8 +86,15 @@ def _build_scene_class(slides: list):
             for i, slide_data in enumerate(slides):
                 title_text = slide_data.get("title", f"Slide {i + 1}")
                 content_text = slide_data.get("content", "")
+                audio_duration = slide_durations[i]
 
-                # --- Background card (subtle rounded rectangle) ---
+                # Calculate hold time = audio duration minus animation time
+                hold_time = max(
+                    audio_duration - ANIM_IN_TIME - ANIM_OUT_TIME,
+                    MIN_HOLD_TIME,
+                )
+
+                # --- Background card ---
                 card = RoundedRectangle(
                     corner_radius=0.3,
                     width=12,
@@ -119,7 +133,7 @@ def _build_scene_class(slides: list):
                     line_spacing=0.6,
                 ).next_to(accent_bar, DOWN, buff=0.6)
 
-                # --- Slide number indicator (dots) ---
+                # --- Slide number dots ---
                 dots = VGroup()
                 for j in range(total_slides):
                     dot = Dot(
@@ -130,27 +144,20 @@ def _build_scene_class(slides: list):
                 dots.arrange(RIGHT, buff=0.2)
                 dots.move_to(ORIGIN).shift(DOWN * 3.2)
 
-                # --- Animations ---
-                # Slide card appears
+                # --- Animate in (~1.5s) ---
                 self.play(
                     FadeIn(card, shift=UP * 0.3),
                     FadeIn(dots),
                     run_time=0.4,
                 )
+                self.play(Write(title), run_time=0.6)
+                self.play(GrowFromCenter(accent_bar), run_time=0.2)
+                self.play(FadeIn(content, shift=UP * 0.2), run_time=0.3)
 
-                # Title writes in
-                self.play(Write(title), run_time=0.8)
+                # --- Hold (matched to audio duration) ---
+                self.wait(hold_time)
 
-                # Accent bar grows from center
-                self.play(GrowFromCenter(accent_bar), run_time=0.3)
-
-                # Content fades in
-                self.play(FadeIn(content, shift=UP * 0.2), run_time=0.5)
-
-                # Hold the slide
-                self.wait(SLIDE_HOLD_DURATION)
-
-                # Fade everything out
+                # --- Animate out (~0.5s) ---
                 self.play(
                     FadeOut(card),
                     FadeOut(title),
@@ -160,24 +167,16 @@ def _build_scene_class(slides: list):
                     run_time=0.5,
                 )
 
-                # Brief pause between slides
-                self.wait(0.2)
+                # Brief gap between slides
+                self.wait(INTER_SLIDE_GAP)
 
     return MicroLearningScene
 
 
-def _render_manim_scene(slides: list, temp_dir: str) -> str:
+def _render_manim_scene(slides: list, slide_durations: list[float], temp_dir: str) -> str:
     """
     Render the Manim scene to a silent MP4 file.
-
-    Args:
-        slides: List of slide dicts with 'title' and 'content'.
-        temp_dir: Directory for Manim media output.
-
-    Returns:
-        Path to the rendered MP4 file.
     """
-    # Configure Manim for vertical video
     config.pixel_width = VIDEO_WIDTH
     config.pixel_height = VIDEO_HEIGHT
     config.frame_rate = FRAME_RATE
@@ -186,12 +185,10 @@ def _render_manim_scene(slides: list, temp_dir: str) -> str:
     config.quality = "high_quality"
     config.disable_caching = True
 
-    # Build and render the scene
-    SceneClass = _build_scene_class(slides)
+    SceneClass = _build_scene_class(slides, slide_durations)
     scene = SceneClass()
     scene.render()
 
-    # Get the output file path
     output_path = str(scene.renderer.file_writer.movie_file_path)
     print(f"[VIDEO] Manim rendered to: {output_path}", flush=True)
     return output_path
@@ -200,31 +197,16 @@ def _render_manim_scene(slides: list, temp_dir: str) -> str:
 def _compose_audio(video_path: str, audio_path: str, output_path: str):
     """
     Merge a Manim-rendered video with a TTS audio file using MoviePy.
-    Trims or loops the audio to match the video duration.
-
-    Args:
-        video_path: Path to the silent Manim video.
-        audio_path: Path to the TTS audio file.
-        output_path: Path for the final composited output.
     """
     print(f"[VIDEO] Compositing audio onto video...", flush=True)
 
     video = VideoFileClip(video_path)
     audio = AudioFileClip(audio_path)
-    video_duration = video.duration
 
-    # Trim or loop audio to match video length
-    if audio.duration > video_duration:
-        audio = audio.subclipped(0, video_duration)
-    elif audio.duration < video_duration:
-        loops_needed = int(video_duration / audio.duration) + 1
-        audio_clips = [
-            audio.with_start(i * audio.duration)
-            for i in range(loops_needed)
-        ]
-        audio = CompositeAudioClip(audio_clips).with_duration(video_duration)
+    # Trim audio if it's slightly longer than video (due to rounding)
+    if audio.duration > video.duration:
+        audio = audio.subclipped(0, video.duration)
 
-    # Set audio on video and export
     final = video.with_audio(audio)
     final.write_videofile(
         output_path,
@@ -233,40 +215,37 @@ def _compose_audio(video_path: str, audio_path: str, output_path: str):
         logger="bar",
     )
 
-    # Cleanup
     final.close()
     video.close()
-    print(f"[VIDEO] Final video with audio: {output_path}", flush=True)
+    print(f"[VIDEO] Final video with synced audio: {output_path}", flush=True)
 
 
 # ---------------------------------------------------------------------------
-# Public API – generate_video (same interface as before)
+# Public API
 # ---------------------------------------------------------------------------
-def generate_video(slides: list, audio_path: str, output_path: str) -> str:
+def generate_video(slides: list, slide_durations: list[float], audio_path: str, output_path: str) -> str:
     """
-    Generate an animated vertical MP4 video from slide data with synced audio.
-
-    Two-step process:
-        1. Render animated slides using Manim → silent MP4
-        2. Composite TTS audio onto the video using MoviePy
+    Generate an animated vertical MP4 video with per-slide duration sync.
 
     Args:
-        slides: List of dicts, each with 'title' and 'content' keys.
-        audio_path: Path to the TTS MP3 audio file.
-        output_path: Path where the final MP4 video will be saved.
+        slides: List of dicts with 'title' and 'content' keys.
+        slide_durations: Duration in seconds for each slide (from TTS).
+        audio_path: Path to the concatenated TTS MP3.
+        output_path: Path for the final MP4.
 
     Returns:
         The output_path on success.
     """
     print(f"[VIDEO] Starting Manim video generation ({len(slides)} slides)...", flush=True)
+    for i, dur in enumerate(slide_durations):
+        print(f"[VIDEO]   Slide {i+1}: {dur:.1f}s", flush=True)
 
-    # Create a temp directory for Manim media
     temp_dir = tempfile.mkdtemp(prefix="manim_render_")
 
     try:
-        # Step 1: Render with Manim
+        # Step 1: Render with Manim (duration-matched)
         print(f"[VIDEO] Step 1/2: Rendering animated slides with Manim...", flush=True)
-        silent_video = _render_manim_scene(slides, temp_dir)
+        silent_video = _render_manim_scene(slides, slide_durations, temp_dir)
 
         # Step 2: Compose audio
         print(f"[VIDEO] Step 2/2: Compositing audio...", flush=True)

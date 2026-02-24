@@ -4,11 +4,9 @@ tasks.py - Background task pipeline for the MicroLearningServer.
 Full processing pipeline triggered after file upload:
     1. Extract text from uploaded file
     2. Generate micro-learning script via Gemini AI
-    3. Generate TTS audio from the script
-    4. Generate video from slides + audio
+    3. Generate per-slide TTS audio (edge-tts) and measure durations
+    4. Generate duration-matched animated video via Manim + compose audio
     5. Update database with results
-
-Day 3: Added TTS + video generation stages to the pipeline.
 """
 
 import json
@@ -17,7 +15,7 @@ from pathlib import Path
 
 from text_extractor import extract_text
 from gemini_service import generate_script
-from tts_service import generate_audio
+from tts_service import generate_per_slide_audio, concatenate_audio
 from video_generator import generate_video
 from database import update_file_status, insert_video
 
@@ -31,13 +29,6 @@ VIDEOS_DIR = Path("videos")
 def process_file(file_id: int, filepath: str, filename: str):
     """
     Full background processing pipeline for an uploaded file.
-
-    Pipeline stages:
-        1. Text extraction
-        2. Gemini script generation
-        3. TTS audio generation
-        4. Video generation
-        5. Database updates
 
     Args:
         file_id: Database ID of the uploaded file.
@@ -79,33 +70,35 @@ def process_file(file_id: int, filepath: str, filename: str):
         print(f"[PIPELINE] Script saved with {len(script['slides'])} slides.", flush=True)
 
         # ==================================================================
-        # Stage 3: Generate TTS audio
+        # Stage 3: Generate per-slide TTS audio
         # ==================================================================
-        print(f"\n[PIPELINE] Stage 3/4: Generating TTS audio...", flush=True)
+        print(f"\n[PIPELINE] Stage 3/4: Generating TTS audio (edge-tts)...", flush=True)
 
-        # Combine all slide content into one script for narration
-        full_narration = ". ".join(
-            f"{slide['title']}. {slide['content']}"
-            for slide in script["slides"]
-        )
+        # Create a unique subdirectory for this file's audio clips
+        audio_subdir = str(AUDIO_DIR / f"file_{file_id}_{uuid.uuid4().hex[:8]}")
 
-        # Generate unique audio filename
-        audio_filename = f"{uuid.uuid4().hex}.mp3"
-        audio_path = str(AUDIO_DIR / audio_filename)
+        # Generate per-slide audio and get durations
+        audio_results = generate_per_slide_audio(script["slides"], audio_subdir)
 
-        generate_audio(full_narration, audio_path)
-        print(f"[PIPELINE] Audio generated: {audio_path}", flush=True)
+        slide_audio_paths = [path for path, _ in audio_results]
+        slide_durations = [duration for _, duration in audio_results]
+
+        # Concatenate all clips into one audio track
+        combined_audio_filename = f"{uuid.uuid4().hex}.mp3"
+        combined_audio_path = str(AUDIO_DIR / combined_audio_filename)
+        concatenate_audio(slide_audio_paths, combined_audio_path)
+
+        print(f"[PIPELINE] Audio ready. Slide durations: {[f'{d:.1f}s' for d in slide_durations]}", flush=True)
 
         # ==================================================================
-        # Stage 4: Generate video
+        # Stage 4: Generate duration-matched video
         # ==================================================================
-        print(f"\n[PIPELINE] Stage 4/4: Generating video...", flush=True)
+        print(f"\n[PIPELINE] Stage 4/4: Generating Manim video...", flush=True)
 
-        # Generate unique video filename
         video_filename = f"{uuid.uuid4().hex}.mp4"
         video_path = str(VIDEOS_DIR / video_filename)
 
-        generate_video(script["slides"], audio_path, video_path)
+        generate_video(script["slides"], slide_durations, combined_audio_path, video_path)
         print(f"[PIPELINE] Video generated: {video_path}", flush=True)
 
         # ==================================================================

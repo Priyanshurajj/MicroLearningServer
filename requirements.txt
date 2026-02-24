@@ -4,6 +4,7 @@ python-multipart
 python-dotenv
 PyPDF2
 google-generativeai
-gTTS
+edge-tts
+mutagen
 manim
 moviepy
