@@ -5,6 +5,7 @@ Uses Python's built-in sqlite3 module (no ORM).
 Database file is stored as 'microlearning.db' in the project root.
 
 Day 2: Added script_json column and update_file_status helper.
+Day 3: Added insert_video helper.
 """
 
 import sqlite3
@@ -139,6 +140,31 @@ def get_videos_by_file_id(file_id: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def insert_video(file_id: int, video_path: str, status: str = "ready") -> int:
+    """
+    Insert a new video record linked to a file.
+
+    Args:
+        file_id: The ID of the parent file record.
+        video_path: Path to the generated video file on disk.
+        status: Video status (default 'ready').
+
+    Returns:
+        The newly created video ID.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO videos (file_id, video_path, status, created_at) VALUES (?, ?, ?, ?)",
+        (file_id, video_path, status, datetime.utcnow()),
+    )
+    conn.commit()
+    video_id = cursor.lastrowid
+    conn.close()
+    print(f"[DB] Video record created: id={video_id}, file_id={file_id}, status='{status}'.")
+    return video_id
+
+
 # ---------------------------------------------------------------------------
 # Helper functions – File status updates (Day 2)
 # ---------------------------------------------------------------------------
@@ -148,7 +174,7 @@ def update_file_status(file_id: int, status: str, script_json: str | None = None
 
     Args:
         file_id: The ID of the file to update.
-        status: New status string (e.g. 'processing', 'script_ready', 'script_failed').
+        status: New status string (e.g. 'processing', 'script_ready', 'video_ready', 'failed').
         script_json: Optional JSON string of the generated script.
     """
     conn = get_connection()

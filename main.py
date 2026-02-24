@@ -2,27 +2,28 @@
 main.py - FastAPI application entry point for MicroLearningServer.
 
 Endpoints:
-    POST /upload          – Upload a .txt or .pdf file (triggers background processing)
+    POST /upload          – Upload a .txt or .pdf file (triggers background pipeline)
     GET  /files           – List all uploaded files
     GET  /status/{file_id} – Get file status, script, and associated videos
+
+Day 3: Refactored to use tasks.py pipeline, added /audio & /videos dirs,
+       added static file serving for generated videos.
 
 Run with:
     uvicorn main:app --reload
 """
 
-import os
 import json
 import uuid
-import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from database import init_db, insert_file, get_all_files, get_file_by_id, get_videos_by_file_id, update_file_status
-from text_extractor import extract_text
-from gemini_service import generate_script
+from tasks import process_file
 
 # ---------------------------------------------------------------------------
 # Load environment variables from .env (if present)
@@ -34,8 +35,8 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="MicroLearningServer",
-    description="Backend API for the Micro-Learning Portal – handles file uploads, text extraction, AI script generation, and video status tracking.",
-    version="2.0.0",
+    description="Backend API for the Micro-Learning Portal – handles file uploads, text extraction, AI script generation, TTS audio, video generation, and status tracking.",
+    version="3.0.0",
 )
 
 # ---------------------------------------------------------------------------
@@ -53,63 +54,34 @@ app.add_middleware(
 # Constants
 # ---------------------------------------------------------------------------
 UPLOAD_DIR = Path("uploads")                     # Directory to store uploaded files
+AUDIO_DIR = Path("audio")                        # Directory to store generated audio
+VIDEOS_DIR = Path("videos")                      # Directory to store generated videos
 ALLOWED_EXTENSIONS = {".txt", ".pdf"}            # Only these file types are accepted
 
 # ---------------------------------------------------------------------------
-# Startup event – initialize DB and create upload directory
+# Startup event – initialize DB and create directories
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 def on_startup():
     """
     Runs once when the server starts.
-    - Creates the uploads directory if it doesn't exist.
+    - Creates the uploads, audio, and videos directories if they don't exist.
     - Initializes the SQLite database tables.
     """
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
     print(f"[STARTUP] Upload directory ready: {UPLOAD_DIR.resolve()}", flush=True)
+    print(f"[STARTUP] Audio directory ready:  {AUDIO_DIR.resolve()}", flush=True)
+    print(f"[STARTUP] Videos directory ready: {VIDEOS_DIR.resolve()}", flush=True)
     init_db()
     print("[STARTUP] Server is ready.", flush=True)
 
-
 # ---------------------------------------------------------------------------
-# Background task – extract text and generate script
+# Static file serving – serve generated videos
 # ---------------------------------------------------------------------------
-def process_file_sync(file_id: int, filepath: str):
-    """
-    Synchronous wrapper for the background task to ensure execution in threadpool.
-    """
-    print(f"[BACKGROUND] process_file_sync STARTED for file {file_id}: {filepath}", flush=True)
-    try:
-        # Step 1: Extract text
-        print(f"[BACKGROUND] Extracting text for file {file_id}...", flush=True)
-        text = extract_text(filepath)
-        if not text or not text.strip():
-            print(f"[BACKGROUND] No text extracted from file {file_id}.", flush=True)
-            update_file_status(file_id, "script_failed")
-            return
-
-        print(f"[BACKGROUND] Extracted {len(text)} characters from file {file_id}. Sending to Gemini...", flush=True)
-
-        # Step 2: Generate script using Gemini
-        script = generate_script(text)
-
-        if script:
-            # Step 3a: Success – store the script as JSON
-            script_json_str = json.dumps(script, ensure_ascii=False)
-            update_file_status(file_id, "script_ready", script_json=script_json_str)
-            print(f"[BACKGROUND] Script generated and saved successfully for file {file_id}!", flush=True)
-        else:
-            # Step 3b: Failure – mark as failed
-            update_file_status(file_id, "script_failed")
-            print(f"[BACKGROUND] Script generation returned None for file {file_id}.", flush=True)
-
-    except Exception as e:
-        print(f"[BACKGROUND] ERROR processing file {file_id}: {e}", flush=True)
-        update_file_status(file_id, "script_failed")
-        import traceback
-        traceback.print_exc()
-        
-    print(f"[BACKGROUND] process_file_sync FINISHED for file {file_id}", flush=True)
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/videos", StaticFiles(directory=str(VIDEOS_DIR)), name="videos")
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +90,14 @@ def process_file_sync(file_id: int, filepath: str):
 @app.post("/upload")
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """
-    Accept a .txt or .pdf file upload and trigger background processing.
+    Accept a .txt or .pdf file upload and trigger the full background pipeline.
+
+    Pipeline (runs in background):
+        1. Extract text from file
+        2. Generate script via Gemini AI
+        3. Generate TTS audio
+        4. Generate video from slides + audio
+        5. Update database with results
     """
     print(f"\n[UPLOAD] --- New upload request received: {file.filename} ---", flush=True)
 
@@ -149,17 +128,14 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
         filename=unique_filename,
         original_filename=original_filename,
     )
-    print(f"[UPLOAD] Saved initial DB record with file_id: {file_id}. Status is currently 'uploaded'.", flush=True)
+    print(f"[UPLOAD] DB record created: file_id={file_id}", flush=True)
 
-    # --- Step 5: Set status to 'processing' and trigger background task ---
-    print(f"[UPLOAD] Updating status to 'processing' for file_id {file_id}...", flush=True)
+    # --- Step 5: Set status to 'processing' and trigger background pipeline ---
     update_file_status(file_id, "processing")
-    
-    print(f"[UPLOAD] Queueing background task for file_id {file_id}...", flush=True)
-    background_tasks.add_task(process_file_sync, file_id, str(file_path))
+    background_tasks.add_task(process_file, file_id, str(file_path), original_filename)
+    print(f"[UPLOAD] Background pipeline queued for file_id={file_id}\n", flush=True)
 
     # --- Step 6: Return response immediately ---
-    print(f"[UPLOAD] Returning success response to client for file_id {file_id}...\n", flush=True)
     return {
         "file_id": file_id,
         "filename": original_filename,

@@ -43,7 +43,7 @@ def generate_script(text: str) -> dict | None:
             "summary": "2-3 line summary of the content",
             "slides": [
                 {"title": "Slide Title", "content": "2-3 lines of content"},
-                ...  (5-7 slides total)
+                ...  (10-12 slides total)
             ]
         }
 
@@ -60,7 +60,7 @@ def generate_script(text: str) -> dict | None:
     # Build the prompt
     prompt = f"""You are an educational content creator specializing in micro-learning.
 
-Given the following text, create a 60-second micro-learning script split into 5-7 slides.
+Given the following text, create a 60-second micro-learning script split into 10-12 slides.
 
 Return your response as pure JSON (no markdown, no code fences, no extra text) in this exact format:
 {{
