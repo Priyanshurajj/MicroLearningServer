@@ -5,6 +5,5 @@ python-dotenv
 PyPDF2
 google-generativeai
 gTTS
+manim
 moviepy
-Pillow
-numpy

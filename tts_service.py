@@ -22,7 +22,7 @@ def generate_audio(text: str, output_path: str) -> str:
     Raises:
         Exception: If gTTS fails to generate the audio.
     """
-    print(f"[TTS] Generating audio ({len(text)} chars) → {output_path}", flush=True)
+    print(f"[TTS] Generating audio ({len(text)} chars) -> {output_path}", flush=True)
 
     tts = gTTS(text=text, lang="en", slow=False)
     tts.save(output_path)

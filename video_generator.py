@@ -1,175 +1,280 @@
 """
-video_generator.py - Video generation from slide data using MoviePy v2 + Pillow.
+video_generator.py - Animated video generation using Manim Community Edition.
 
-Creates a vertical (720×1280) MP4 video where each slide is rendered as
-white text on a dark background with fade-in/out transitions and an audio track.
+Creates a vertical (1080×1920) animated MP4 video where each slide features:
+    - Dark gradient background
+    - Animated title (Write effect)
+    - Decorative accent bar
+    - Animated content text (FadeIn effect)
+    - Slide number indicator
+    - Smooth fade transitions between slides
+
+Audio is composed onto the video using MoviePy after Manim rendering.
 
 Requirements:
-    - moviepy (v2.x), Pillow, numpy
-    - FFmpeg must be installed and available on PATH
-      Windows:  choco install ffmpeg   OR   download from https://ffmpeg.org/download.html
-      Linux:    sudo apt install ffmpeg
-      macOS:    brew install ffmpeg
+    - manim (Community Edition)
+    - moviepy (for audio compositing)
+    - FFmpeg (bundled via imageio-ffmpeg)
 """
 
+import os
+import uuid
+import tempfile
 import textwrap
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+
+from manim import (
+    Scene,
+    Text,
+    Rectangle,
+    RoundedRectangle,
+    Line,
+    VGroup,
+    Dot,
+    config,
+    Write,
+    FadeIn,
+    FadeOut,
+    GrowFromCenter,
+    Create,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
+    ORIGIN,
+    WHITE,
+    GRAY,
+    ManimColor,
+)
 from moviepy import (
-    ImageClip,
+    VideoFileClip,
     AudioFileClip,
     CompositeAudioClip,
-    concatenate_videoclips,
 )
-from moviepy.video.fx import CrossFadeIn, CrossFadeOut
 
 
 # ---------------------------------------------------------------------------
 # Video configuration
 # ---------------------------------------------------------------------------
-VIDEO_WIDTH = 720
-VIDEO_HEIGHT = 1280
-BG_COLOR = (26, 26, 46)         # #1a1a2e — dark navy background
-TITLE_COLOR = (255, 255, 255)   # White
-CONTENT_COLOR = (220, 220, 230) # Slightly softer white
-SLIDE_DURATION = 20              # Seconds per slide
-FADE_DURATION = 0.5             # Fade transition duration
+VIDEO_WIDTH = 1080
+VIDEO_HEIGHT = 1920
+FRAME_RATE = 30
+BG_COLOR = "#1a1a2e"
+ACCENT_COLOR = "#e94560"
+ACCENT_SECONDARY = "#0f3460"
+TITLE_COLOR = "#ffffff"
+CONTENT_COLOR = "#e0e0e8"
+SLIDE_HOLD_DURATION = 4     # Seconds to hold each slide (excluding animation time)
 
 
-# ---------------------------------------------------------------------------
-# Helper – render a single slide as a numpy image array
-# ---------------------------------------------------------------------------
-def _render_slide_frame(title: str, content: str) -> np.ndarray:
+def _build_scene_class(slides: list):
     """
-    Draw a single slide (title + content) on a dark background using Pillow.
-    Returns a numpy array (H, W, 3) suitable for MoviePy ImageClip.
+    Dynamically construct a Manim Scene class for the given slides.
+    Returns the class (not an instance).
     """
-    img = Image.new("RGB", (VIDEO_WIDTH, VIDEO_HEIGHT), BG_COLOR)
-    draw = ImageDraw.Draw(img)
 
-    # --- Load fonts (use system default if custom not available) ---
-    try:
-        title_font = ImageFont.truetype("arial.ttf", 48)
-        content_font = ImageFont.truetype("arial.ttf", 32)
-    except (OSError, IOError):
-        try:
-            title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 48)
-            content_font = ImageFont.truetype("DejaVuSans.ttf", 32)
-        except (OSError, IOError):
-            title_font = ImageFont.load_default()
-            content_font = ImageFont.load_default()
+    class MicroLearningScene(Scene):
+        def construct(self):
+            total_slides = len(slides)
 
-    # --- Wrap text to fit within the video width ---
-    max_chars_title = 28
-    max_chars_content = 38
+            for i, slide_data in enumerate(slides):
+                title_text = slide_data.get("title", f"Slide {i + 1}")
+                content_text = slide_data.get("content", "")
 
-    wrapped_title = textwrap.fill(title, width=max_chars_title)
-    wrapped_content = textwrap.fill(content, width=max_chars_content)
+                # --- Background card (subtle rounded rectangle) ---
+                card = RoundedRectangle(
+                    corner_radius=0.3,
+                    width=12,
+                    height=6,
+                    fill_color=ManimColor(ACCENT_SECONDARY),
+                    fill_opacity=0.15,
+                    stroke_color=ManimColor(ACCENT_SECONDARY),
+                    stroke_opacity=0.3,
+                    stroke_width=1.5,
+                )
+                card.move_to(ORIGIN).shift(UP * 0.5)
 
-    # --- Calculate positions ---
-    # Title area: top 30% of frame
-    title_y = 250
-    # Content area: center of frame
-    content_y = 550
+                # --- Title ---
+                wrapped_title = textwrap.fill(title_text, width=30)
+                title = Text(
+                    wrapped_title,
+                    font_size=44,
+                    color=ManimColor(TITLE_COLOR),
+                    weight="BOLD",
+                ).move_to(ORIGIN).shift(UP * 2.5)
 
-    # --- Draw title (centered) ---
-    title_bbox = draw.textbbox((0, 0), wrapped_title, font=title_font)
-    title_w = title_bbox[2] - title_bbox[0]
-    title_x = (VIDEO_WIDTH - title_w) // 2
-    draw.text(
-        (title_x, title_y),
-        wrapped_title,
-        fill=TITLE_COLOR,
-        font=title_font,
-    )
+                # --- Accent underline bar ---
+                accent_bar = Line(
+                    start=LEFT * 2,
+                    end=RIGHT * 2,
+                    color=ManimColor(ACCENT_COLOR),
+                    stroke_width=4,
+                ).next_to(title, DOWN, buff=0.3)
 
-    # --- Draw content (centered) ---
-    content_bbox = draw.textbbox((0, 0), wrapped_content, font=content_font)
-    content_w = content_bbox[2] - content_bbox[0]
-    content_x = (VIDEO_WIDTH - content_w) // 2
-    draw.text(
-        (content_x, content_y),
-        wrapped_content,
-        fill=CONTENT_COLOR,
-        font=content_font,
-    )
+                # --- Content text ---
+                wrapped_content = textwrap.fill(content_text, width=40)
+                content = Text(
+                    wrapped_content,
+                    font_size=28,
+                    color=ManimColor(CONTENT_COLOR),
+                    line_spacing=0.6,
+                ).next_to(accent_bar, DOWN, buff=0.6)
 
-    return np.array(img)
+                # --- Slide number indicator (dots) ---
+                dots = VGroup()
+                for j in range(total_slides):
+                    dot = Dot(
+                        radius=0.06,
+                        color=ManimColor(ACCENT_COLOR) if j == i else ManimColor("#555555"),
+                    )
+                    dots.add(dot)
+                dots.arrange(RIGHT, buff=0.2)
+                dots.move_to(ORIGIN).shift(DOWN * 3.2)
+
+                # --- Animations ---
+                # Slide card appears
+                self.play(
+                    FadeIn(card, shift=UP * 0.3),
+                    FadeIn(dots),
+                    run_time=0.4,
+                )
+
+                # Title writes in
+                self.play(Write(title), run_time=0.8)
+
+                # Accent bar grows from center
+                self.play(GrowFromCenter(accent_bar), run_time=0.3)
+
+                # Content fades in
+                self.play(FadeIn(content, shift=UP * 0.2), run_time=0.5)
+
+                # Hold the slide
+                self.wait(SLIDE_HOLD_DURATION)
+
+                # Fade everything out
+                self.play(
+                    FadeOut(card),
+                    FadeOut(title),
+                    FadeOut(accent_bar),
+                    FadeOut(content),
+                    FadeOut(dots),
+                    run_time=0.5,
+                )
+
+                # Brief pause between slides
+                self.wait(0.2)
+
+    return MicroLearningScene
 
 
-# ---------------------------------------------------------------------------
-# Main – generate video from slides + audio
-# ---------------------------------------------------------------------------
-def generate_video(slides: list, audio_path: str, output_path: str) -> str:
+def _render_manim_scene(slides: list, temp_dir: str) -> str:
     """
-    Generate a vertical MP4 video from slide data and an audio file.
+    Render the Manim scene to a silent MP4 file.
 
     Args:
-        slides: List of dicts, each with 'title' and 'content' keys.
-        audio_path: Path to the MP3 audio file.
-        output_path: Path where the final MP4 video will be saved.
+        slides: List of slide dicts with 'title' and 'content'.
+        temp_dir: Directory for Manim media output.
 
     Returns:
-        The output_path on success.
+        Path to the rendered MP4 file.
     """
-    print(f"[VIDEO] Generating video with {len(slides)} slides...", flush=True)
+    # Configure Manim for vertical video
+    config.pixel_width = VIDEO_WIDTH
+    config.pixel_height = VIDEO_HEIGHT
+    config.frame_rate = FRAME_RATE
+    config.media_dir = temp_dir
+    config.background_color = ManimColor(BG_COLOR)
+    config.quality = "high_quality"
+    config.disable_caching = True
 
-    # --- Build individual slide clips ---
-    slide_clips = []
-    for i, slide in enumerate(slides):
-        title = slide.get("title", f"Slide {i + 1}")
-        content = slide.get("content", "")
+    # Build and render the scene
+    SceneClass = _build_scene_class(slides)
+    scene = SceneClass()
+    scene.render()
 
-        frame = _render_slide_frame(title, content)
-        clip = ImageClip(frame, duration=SLIDE_DURATION)
+    # Get the output file path
+    output_path = str(scene.renderer.file_writer.movie_file_path)
+    print(f"[VIDEO] Manim rendered to: {output_path}", flush=True)
+    return output_path
 
-        # Apply fade-in and fade-out transitions
-        clip = clip.with_effects([
-            CrossFadeIn(FADE_DURATION),
-            CrossFadeOut(FADE_DURATION),
-        ])
 
-        slide_clips.append(clip)
-        print(f"[VIDEO]   Slide {i + 1}/{len(slides)}: \"{title}\"", flush=True)
+def _compose_audio(video_path: str, audio_path: str, output_path: str):
+    """
+    Merge a Manim-rendered video with a TTS audio file using MoviePy.
+    Trims or loops the audio to match the video duration.
 
-    # --- Concatenate all slides ---
-    video = concatenate_videoclips(slide_clips, method="compose")
+    Args:
+        video_path: Path to the silent Manim video.
+        audio_path: Path to the TTS audio file.
+        output_path: Path for the final composited output.
+    """
+    print(f"[VIDEO] Compositing audio onto video...", flush=True)
+
+    video = VideoFileClip(video_path)
+    audio = AudioFileClip(audio_path)
     video_duration = video.duration
-    print(f"[VIDEO] Total video duration: {video_duration:.1f}s", flush=True)
 
-    # --- Add audio track ---
-    try:
-        audio = AudioFileClip(audio_path)
+    # Trim or loop audio to match video length
+    if audio.duration > video_duration:
+        audio = audio.subclipped(0, video_duration)
+    elif audio.duration < video_duration:
+        loops_needed = int(video_duration / audio.duration) + 1
+        audio_clips = [
+            audio.with_start(i * audio.duration)
+            for i in range(loops_needed)
+        ]
+        audio = CompositeAudioClip(audio_clips).with_duration(video_duration)
 
-        # Trim or loop audio to match video length
-        if audio.duration > video_duration:
-            # Trim audio to video length
-            audio = audio.subclipped(0, video_duration)
-        elif audio.duration < video_duration:
-            # Loop audio to fill video duration
-            loops_needed = int(video_duration / audio.duration) + 1
-            audio_clips = [
-                audio.with_start(i * audio.duration)
-                for i in range(loops_needed)
-            ]
-            audio = CompositeAudioClip(audio_clips).with_duration(video_duration)
-
-        video = video.with_audio(audio)
-        print(f"[VIDEO] Audio track added.", flush=True)
-    except Exception as e:
-        print(f"[VIDEO] WARNING: Could not add audio: {e}. Video will be silent.", flush=True)
-
-    # --- Export as MP4 ---
-    print(f"[VIDEO] Exporting to {output_path}...", flush=True)
-    video.write_videofile(
+    # Set audio on video and export
+    final = video.with_audio(audio)
+    final.write_videofile(
         output_path,
-        fps=24,
         codec="libx264",
         audio_codec="aac",
         logger="bar",
     )
 
-    # --- Cleanup ---
+    # Cleanup
+    final.close()
     video.close()
-    print(f"[VIDEO] Video saved successfully: {output_path}", flush=True)
-    return output_path
+    print(f"[VIDEO] Final video with audio: {output_path}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Public API – generate_video (same interface as before)
+# ---------------------------------------------------------------------------
+def generate_video(slides: list, audio_path: str, output_path: str) -> str:
+    """
+    Generate an animated vertical MP4 video from slide data with synced audio.
+
+    Two-step process:
+        1. Render animated slides using Manim → silent MP4
+        2. Composite TTS audio onto the video using MoviePy
+
+    Args:
+        slides: List of dicts, each with 'title' and 'content' keys.
+        audio_path: Path to the TTS MP3 audio file.
+        output_path: Path where the final MP4 video will be saved.
+
+    Returns:
+        The output_path on success.
+    """
+    print(f"[VIDEO] Starting Manim video generation ({len(slides)} slides)...", flush=True)
+
+    # Create a temp directory for Manim media
+    temp_dir = tempfile.mkdtemp(prefix="manim_render_")
+
+    try:
+        # Step 1: Render with Manim
+        print(f"[VIDEO] Step 1/2: Rendering animated slides with Manim...", flush=True)
+        silent_video = _render_manim_scene(slides, temp_dir)
+
+        # Step 2: Compose audio
+        print(f"[VIDEO] Step 2/2: Compositing audio...", flush=True)
+        _compose_audio(silent_video, audio_path, output_path)
+
+        print(f"[VIDEO] Video generation complete: {output_path}", flush=True)
+        return output_path
+
+    except Exception as e:
+        print(f"[VIDEO] ERROR during video generation: {e}", flush=True)
+        raise
