@@ -50,10 +50,6 @@ from moviepy import (
     AudioFileClip,
 )
 
-
-# ---------------------------------------------------------------------------
-# Video configuration
-# ---------------------------------------------------------------------------
 VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920
 FRAME_RATE = 30
@@ -174,9 +170,6 @@ def _build_scene_class(slides: list, slide_durations: list[float]):
 
 
 def _render_manim_scene(slides: list, slide_durations: list[float], temp_dir: str) -> str:
-    """
-    Render the Manim scene to a silent MP4 file.
-    """
     config.pixel_width = VIDEO_WIDTH
     config.pixel_height = VIDEO_HEIGHT
     config.frame_rate = FRAME_RATE
@@ -190,15 +183,12 @@ def _render_manim_scene(slides: list, slide_durations: list[float], temp_dir: st
     scene.render()
 
     output_path = str(scene.renderer.file_writer.movie_file_path)
-    print(f"[VIDEO] Manim rendered to: {output_path}", flush=True)
+    print(f"Manim rendered to: {output_path}", flush=True)
     return output_path
 
 
 def _compose_audio(video_path: str, audio_path: str, output_path: str):
-    """
-    Merge a Manim-rendered video with a TTS audio file using MoviePy.
-    """
-    print(f"[VIDEO] Compositing audio onto video...", flush=True)
+    print(f"Compositing audio onto video...", flush=True)
 
     video = VideoFileClip(video_path)
     audio = AudioFileClip(audio_path)
@@ -217,43 +207,26 @@ def _compose_audio(video_path: str, audio_path: str, output_path: str):
 
     final.close()
     video.close()
-    print(f"[VIDEO] Final video with synced audio: {output_path}", flush=True)
+    print(f"Final video with synced audio: {output_path}", flush=True)
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 def generate_video(slides: list, slide_durations: list[float], audio_path: str, output_path: str) -> str:
-    """
-    Generate an animated vertical MP4 video with per-slide duration sync.
-
-    Args:
-        slides: List of dicts with 'title' and 'content' keys.
-        slide_durations: Duration in seconds for each slide (from TTS).
-        audio_path: Path to the concatenated TTS MP3.
-        output_path: Path for the final MP4.
-
-    Returns:
-        The output_path on success.
-    """
-    print(f"[VIDEO] Starting Manim video generation ({len(slides)} slides)...", flush=True)
+    print(f"Starting Manim video generation ({len(slides)} slides)...", flush=True)
     for i, dur in enumerate(slide_durations):
-        print(f"[VIDEO]   Slide {i+1}: {dur:.1f}s", flush=True)
+        print(f"Slide {i+1}: {dur:.1f}s", flush=True)
 
     temp_dir = tempfile.mkdtemp(prefix="manim_render_")
 
     try:
-        # Step 1: Render with Manim (duration-matched)
-        print(f"[VIDEO] Step 1/2: Rendering animated slides with Manim...", flush=True)
+        print(f"Rendering animated slides with Manim", flush=True)
         silent_video = _render_manim_scene(slides, slide_durations, temp_dir)
 
         # Step 2: Compose audio
-        print(f"[VIDEO] Step 2/2: Compositing audio...", flush=True)
+        print(f"Compositing audio", flush=True)
         _compose_audio(silent_video, audio_path, output_path)
 
-        print(f"[VIDEO] Video generation complete: {output_path}", flush=True)
+        print(f"Video generation complete: {output_path}", flush=True)
         return output_path
 
     except Exception as e:
-        print(f"[VIDEO] ERROR during video generation: {e}", flush=True)
+        print(f"ERROR during video generation: {e}", flush=True)
         raise

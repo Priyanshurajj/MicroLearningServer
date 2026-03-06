@@ -1,14 +1,3 @@
-"""
-tasks.py - Background task pipeline for the MicroLearningServer.
-
-Full processing pipeline triggered after file upload:
-    1. Extract text from uploaded file
-    2. Generate micro-learning script via Gemini AI
-    3. Generate per-slide TTS audio (edge-tts) and measure durations
-    4. Generate duration-matched animated video via Manim + compose audio
-    5. Update database with results
-"""
-
 import json
 import uuid
 from pathlib import Path
@@ -19,100 +8,63 @@ from tts_service import generate_per_slide_audio, concatenate_audio
 from video_generator import generate_video
 from database import update_file_status, insert_video
 
-# ---------------------------------------------------------------------------
-# Output directories (created at startup in main.py)
-# ---------------------------------------------------------------------------
 AUDIO_DIR = Path("audio")
 VIDEOS_DIR = Path("videos")
 
-
 def process_file(file_id: int, filepath: str, filename: str):
-    """
-    Full background processing pipeline for an uploaded file.
-
-    Args:
-        file_id: Database ID of the uploaded file.
-        filepath: Full path to the uploaded file on disk.
-        filename: Original filename (used for naming outputs).
-    """
-    print(f"\n{'='*60}", flush=True)
-    print(f"[PIPELINE] STARTED for file_id={file_id}: {filename}", flush=True)
-    print(f"{'='*60}", flush=True)
-
+    print(f"STARTED for file_id={file_id}: {filename}", flush=True)
     try:
-        # ==================================================================
-        # Stage 1: Extract text
-        # ==================================================================
-        print(f"\n[PIPELINE] Stage 1/4: Extracting text...", flush=True)
+        print(f"\nExtracting text...", flush=True)
         text = extract_text(filepath)
-
         if not text or not text.strip():
-            print(f"[PIPELINE] FAILED: No text could be extracted.", flush=True)
+            print(f"FAILED: No text could be extracted.", flush=True)
             update_file_status(file_id, "failed")
             return
+        print(f"Text extracted: {len(text)} characters.", flush=True)
 
-        print(f"[PIPELINE] Text extracted: {len(text)} characters.", flush=True)
 
-        # ==================================================================
-        # Stage 2: Generate script via Gemini
-        # ==================================================================
-        print(f"\n[PIPELINE] Stage 2/4: Generating script via Gemini...", flush=True)
+        print(f"\nGenerating script via Gemini...", flush=True)
         script = generate_script(text)
 
         if not script:
-            print(f"[PIPELINE] FAILED: Gemini script generation returned None.", flush=True)
+            print(f"FAILED: Gemini script generation returned None.", flush=True)
             update_file_status(file_id, "failed")
             return
 
-        # Save script to DB
         script_json_str = json.dumps(script, ensure_ascii=False)
         update_file_status(file_id, "script_ready", script_json=script_json_str)
-        print(f"[PIPELINE] Script saved with {len(script['slides'])} slides.", flush=True)
+        print(f"Script saved with {len(script['slides'])} slides.", flush=True)
 
-        # ==================================================================
-        # Stage 3: Generate per-slide TTS audio
-        # ==================================================================
-        print(f"\n[PIPELINE] Stage 3/4: Generating TTS audio (edge-tts)...", flush=True)
+        print(f"\nGenerating TTS audio (edge-tts)...", flush=True)
 
-        # Create a unique subdirectory for this file's audio clips
         audio_subdir = str(AUDIO_DIR / f"file_{file_id}_{uuid.uuid4().hex[:8]}")
 
-        # Generate per-slide audio and get durations
         audio_results = generate_per_slide_audio(script["slides"], audio_subdir)
 
         slide_audio_paths = [path for path, _ in audio_results]
         slide_durations = [duration for _, duration in audio_results]
 
-        # Concatenate all clips into one audio track
         combined_audio_filename = f"{uuid.uuid4().hex}.mp3"
         combined_audio_path = str(AUDIO_DIR / combined_audio_filename)
         concatenate_audio(slide_audio_paths, combined_audio_path)
 
-        print(f"[PIPELINE] Audio ready. Slide durations: {[f'{d:.1f}s' for d in slide_durations]}", flush=True)
+        print(f"Audio ready. Slide durations: {[f'{d:.1f}s' for d in slide_durations]}", flush=True)
 
-        # ==================================================================
-        # Stage 4: Generate duration-matched video
-        # ==================================================================
-        print(f"\n[PIPELINE] Stage 4/4: Generating Manim video...", flush=True)
+        print(f"\nGenerating Manim video...", flush=True)
 
         video_filename = f"{uuid.uuid4().hex}.mp4"
         video_path = str(VIDEOS_DIR / video_filename)
 
         generate_video(script["slides"], slide_durations, combined_audio_path, video_path)
-        print(f"[PIPELINE] Video generated: {video_path}", flush=True)
+        print(f"Video generated: {video_path}", flush=True)
 
-        # ==================================================================
-        # Final: Update database
-        # ==================================================================
         insert_video(file_id, video_path, status="ready")
         update_file_status(file_id, "video_ready")
 
-        print(f"\n{'='*60}", flush=True)
-        print(f"[PIPELINE] COMPLETED for file_id={file_id}: {filename}", flush=True)
-        print(f"{'='*60}\n", flush=True)
-
+        print(f"COMPLETED for file_id={file_id}: {filename}", flush=True)
+  
     except Exception as e:
-        print(f"\n[PIPELINE] FATAL ERROR for file_id={file_id}: {e}", flush=True)
+        print(f"\nFATAL ERROR for file_id={file_id}: {e}", flush=True)
         import traceback
         traceback.print_exc()
         update_file_status(file_id, "failed")

@@ -1,22 +1,10 @@
-"""
-gemini_service.py - Google Gemini AI integration for micro-learning script generation.
-
-Generates a structured educational script (summary + slides) from extracted text
-using the Google Gemini API.
-"""
-
 import os
 import json
 import re
-
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# ---------------------------------------------------------------------------
-# Load environment & configure Gemini
-# ---------------------------------------------------------------------------
 load_dotenv()
-
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
@@ -25,39 +13,13 @@ if GEMINI_API_KEY:
 else:
     print("[GEMINI] WARNING: GEMINI_API_KEY not found in environment. AI features will fail.")
 
-# ---------------------------------------------------------------------------
-# Gemini model configuration
-# ---------------------------------------------------------------------------
 MODEL_NAME = "gemini-3-flash-preview"
 
-
-# ---------------------------------------------------------------------------
-# Generate script from extracted text
-# ---------------------------------------------------------------------------
 def generate_script(text: str) -> dict | None:
-    """
-    Use Google Gemini to generate a 60-second micro-learning script from the given text.
-
-    The script is structured as:
-        {
-            "summary": "2-3 line summary of the content",
-            "slides": [
-                {"title": "Slide Title", "content": "2-3 lines of content"},
-                ...  (10-12 slides total)
-            ]
-        }
-
-    Args:
-        text: The extracted text from an uploaded document.
-
-    Returns:
-        A dictionary with 'summary' and 'slides' keys, or None on failure.
-    """
     if not GEMINI_API_KEY:
         print("[GEMINI] ERROR: No API key configured. Cannot generate script.")
         return None
 
-    # Build the prompt
     prompt = f"""You are an educational content creator specializing in micro-learning.
 
 Given the following text, create a 60-second micro-learning script split into 10-12 slides.
@@ -85,22 +47,17 @@ Text to process:
 ---"""
 
     try:
-        # Call Gemini API
         model = genai.GenerativeModel(MODEL_NAME)
         response = model.generate_content(prompt)
 
-        # Extract the response text
         response_text = response.text.strip()
-
-        # Strip markdown code fences if Gemini wraps the JSON in them
+        
         response_text = re.sub(r"^```(?:json)?\s*", "", response_text)
         response_text = re.sub(r"\s*```$", "", response_text)
         response_text = response_text.strip()
 
-        # Parse as JSON
         script = json.loads(response_text)
 
-        # Basic validation
         if "summary" not in script or "slides" not in script:
             print("[GEMINI] ERROR: Response missing required keys ('summary', 'slides').")
             return None

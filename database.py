@@ -1,44 +1,18 @@
-"""
-database.py - SQLite database setup and helper functions.
-
-Uses Python's built-in sqlite3 module (no ORM).
-Database file is stored as 'microlearning.db' in the project root.
-
-Day 2: Added script_json column and update_file_status helper.
-Day 3: Added insert_video helper.
-"""
-
 import sqlite3
 from datetime import datetime
 
-# ---------------------------------------------------------------------------
-# Database path
-# ---------------------------------------------------------------------------
 DATABASE_PATH = "microlearning.db"
 
 
 def get_connection() -> sqlite3.Connection:
-    """
-    Create and return a new SQLite connection.
-    Enables row_factory so query results behave like dictionaries.
-    """
     conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row  # Access columns by name
+    conn.row_factory = sqlite3.Row
     return conn
 
-
-# ---------------------------------------------------------------------------
-# Initialization – create tables if they don't exist
-# ---------------------------------------------------------------------------
 def init_db() -> None:
-    """
-    Initialize the database by creating the required tables.
-    Safe to call multiple times (uses IF NOT EXISTS).
-    """
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Table: files – stores metadata about uploaded files
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS files (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +23,6 @@ def init_db() -> None:
         )
     """)
 
-    # Table: videos – stores generated video metadata linked to a file
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS videos (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,27 +34,17 @@ def init_db() -> None:
         )
     """)
 
-    # Day 2: Add script_json column if it doesn't already exist
     try:
         cursor.execute("ALTER TABLE files ADD COLUMN script_json TEXT")
         print("[DB] Added 'script_json' column to files table.")
     except sqlite3.OperationalError:
-        # Column already exists — safe to ignore
         pass
 
     conn.commit()
     conn.close()
     print("[DB] Database initialized – tables ready.")
 
-
-# ---------------------------------------------------------------------------
-# Helper functions – Files
-# ---------------------------------------------------------------------------
 def insert_file(filename: str, original_filename: str) -> int:
-    """
-    Insert a new file record with status 'uploaded'.
-    Returns the newly created file ID.
-    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -89,16 +52,12 @@ def insert_file(filename: str, original_filename: str) -> int:
         (filename, original_filename, "uploaded", datetime.utcnow()),
     )
     conn.commit()
-    file_id = cursor.lastrowid  # Auto-generated primary key
+    file_id = cursor.lastrowid
     conn.close()
     return file_id
 
 
 def get_all_files() -> list[dict]:
-    """
-    Retrieve every record from the files table.
-    Returns a list of dictionaries.
-    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM files ORDER BY created_at DESC")
@@ -109,10 +68,6 @@ def get_all_files() -> list[dict]:
 
 
 def get_file_by_id(file_id: int) -> dict | None:
-    """
-    Retrieve a single file record by its ID.
-    Returns a dictionary or None if not found.
-    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM files WHERE id = ?", (file_id,))
@@ -121,14 +76,7 @@ def get_file_by_id(file_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-# ---------------------------------------------------------------------------
-# Helper functions – Videos
-# ---------------------------------------------------------------------------
 def get_videos_by_file_id(file_id: int) -> list[dict]:
-    """
-    Retrieve all video records associated with a given file ID.
-    Returns a list of dictionaries.
-    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -165,9 +113,6 @@ def insert_video(file_id: int, video_path: str, status: str = "ready") -> int:
     return video_id
 
 
-# ---------------------------------------------------------------------------
-# Helper functions – File status updates (Day 2)
-# ---------------------------------------------------------------------------
 def update_file_status(file_id: int, status: str, script_json: str | None = None) -> None:
     """
     Update the status (and optionally the script_json) of a file record.
