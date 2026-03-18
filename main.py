@@ -25,19 +25,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path("uploads")                
-AUDIO_DIR = Path("audio")              
-VIDEOS_DIR = Path("videos")            
-ALLOWED_EXTENSIONS = {".txt", ".pdf"} 
+UPLOAD_DIR = Path("uploads")
+AUDIO_DIR = Path("audio")
+VIDEOS_DIR = Path("videos")
+IMAGES_DIR = Path("images")
+ALLOWED_EXTENSIONS = {".txt", ".pdf"}
 
 @app.on_event("startup")
 def on_startup():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"[STARTUP] Upload directory ready: {UPLOAD_DIR.resolve()}", flush=True)
-    print(f"[STARTUP] Audio directory ready:  {AUDIO_DIR.resolve()}", flush=True)
-    print(f"[STARTUP] Videos directory ready: {VIDEOS_DIR.resolve()}", flush=True)
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"[STARTUP] Upload directory ready:  {UPLOAD_DIR.resolve()}", flush=True)
+    print(f"[STARTUP] Audio directory ready:   {AUDIO_DIR.resolve()}", flush=True)
+    print(f"[STARTUP] Videos directory ready:  {VIDEOS_DIR.resolve()}", flush=True)
+    print(f"[STARTUP] Images directory ready:  {IMAGES_DIR.resolve()}", flush=True)
     init_db()
     print("[STARTUP] Server is ready.", flush=True)
 

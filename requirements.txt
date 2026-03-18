@@ -3,8 +3,10 @@ uvicorn
 python-multipart
 python-dotenv
 PyPDF2
-google-generativeai
+google-genai
 edge-tts
 mutagen
 manim
 moviepy
+Pillow
+numpy
