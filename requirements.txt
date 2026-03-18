@@ -4,6 +4,7 @@ python-multipart
 python-dotenv
 PyPDF2
 google-genai
+google-adk
 edge-tts
 mutagen
 manim
