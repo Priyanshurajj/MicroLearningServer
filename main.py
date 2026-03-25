@@ -1,0 +1,45 @@
+import logging
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
+
+from routes import generate_router
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+app = FastAPI(
+    title="EduReel ADK Server",
+    description=(
+        "Educational reel video generation server powered by Google ADK. "
+        "Submit transcript text and get an AI-generated educational reel video "
+        "via a multi-agent pipeline."
+    ),
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(generate_router)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+    )
