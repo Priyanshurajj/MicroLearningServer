@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -19,7 +20,16 @@ runner = Runner(
 async def run_agent_pipeline(
     user_id: str, session_id: str, transcript: str
 ) -> tuple[str, list[dict]]:
-    session = await session_service.create_session(
+    try:
+        return await _execute_pipeline(user_id, session_id, transcript)
+    except Exception as e:
+        raise
+
+
+async def _execute_pipeline(
+    user_id: str, session_id: str, transcript: str
+) -> tuple[str, list[dict]]:
+    await session_service.create_session(
         app_name=APP_NAME,
         user_id=user_id,
         session_id=session_id,
@@ -50,11 +60,14 @@ async def run_agent_pipeline(
                 if part.text:
                     content_text += part.text
                 elif part.function_call:
-                    content_text += f"[TOOL CALL: {part.function_call.name}({dict(part.function_call.args) if part.function_call.args else {}})]"
+                    content_text += (
+                        f"[TOOL CALL: {part.function_call.name}"
+                        f"({dict(part.function_call.args) if part.function_call.args else {}})]"
+                    )
                 elif part.function_response:
                     content_text += f"[TOOL RESPONSE: {part.function_response.name}]"
 
-        status_tag = " FINAL" if is_final else ""
+        status_tag = "FINAL" if is_final else ""
         preview = content_text[:200] + ("..." if len(content_text) > 200 else "")
         logger.info(f"Agent: {agent_name} | Author: {author}{status_tag}")
         logger.info(f"Content: {preview}")
@@ -71,3 +84,4 @@ async def run_agent_pipeline(
 
     logger.info(f"PIPELINE END | Total steps: {len(agent_logs)}")
     return final_response_text, agent_logs
+

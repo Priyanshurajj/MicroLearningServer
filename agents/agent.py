@@ -1,53 +1,57 @@
-from google.adk.agents import Agent, SequentialAgent
+from google.adk.agents import Agent, SequentialAgent, ParallelAgent
 from .script_generation_agent import generate_script
-from .tts_agent import tts_agent_general, tts_agent_maths
-from .image_generation_agent import image_agent_general, image_agent_maths
-from .video_generation_agent import video_generation_agent
-from .manim_video_generation_agent import manim_video_generation_agent
+from .creative_director_agent import creative_director_agent
+from .tts_agent import tts_agent
+from .visual_asset_agent import visual_asset_agent
+from .manim_qc_agent import manim_qc_agent
+from .video_editor_agent import video_editor_agent
 
-general_pipeline = SequentialAgent(
-    name="general_pipeline",
+
+parallel_asset_generator = ParallelAgent(
+    name="parallel_asset_generator",
     description=(
-        "Sequential pipeline for GENERAL educational content. "
-        "Runs: TTS → Image Generation → Video Generation. "
-        "Use this when content_type is 'general'."
+        "Runs TTS generation and visual asset generation in parallel. "
+        "Both agents read from 'enhanced_script' in session state and write "
+        "their outputs to 'tts_output' and 'visual_output' respectively."
     ),
-    sub_agents=[tts_agent_general, image_agent_general, video_generation_agent],
+    sub_agents=[tts_agent, visual_asset_agent],
 )
 
-maths_pipeline = SequentialAgent(
-    name="maths_pipeline",
+master_pipeline = SequentialAgent(
+    name="master_pipeline",
     description=(
-        "Sequential pipeline for MATHEMATICAL educational content. "
-        "Runs: TTS → Image Generation → Manim Video Generation. "
-        "Use this when content_type is 'maths'."
+        "The full content creation pipeline: "
+        "Creative Director → Parallel(TTS + Visuals) → Manim QC → Video Editor"
     ),
-    sub_agents=[tts_agent_maths, image_agent_maths, manim_video_generation_agent],
+    sub_agents=[
+        creative_director_agent,   # Step 2: Enhance visual prompts
+        parallel_asset_generator,  # Step 3: Generate TTS + images/manim code in parallel
+        manim_qc_agent,            # Step 4: Validate and render Manim clips
+        video_editor_agent,        # Step 5: Compose final mixed video
+    ],
 )
 
 root_agent = Agent(
     name="root_agent",
     model="gemini-3-flash-preview",
     description=(
-        "Root orchestrator for the EduReel video generation pipeline. "
-        "Generates a script via tool, then routes to the appropriate pipeline."
+        "Director Agent for the EduReel video generation pipeline. "
+        "Generates a script via tool call, then transfers to the master pipeline."
     ),
-    instruction="""You are the Root Orchestrator for the EduReel educational video generation system.
+    instruction="""You are the Director Agent for the EduReel educational video generation system.
 
-STEP 1: Call the `generate_script` tool with the user's transcript.
-  - The tool returns a JSON object with a "script" field.
-  - Parse the "script" JSON and find the "content_type" field.
+    STEP 1: Call the `generate_script` tool with the user's transcript.
+    - The tool returns a JSON object with a "script" field.
 
-STEP 2: Based on content_type, transfer to the correct pipeline:
-  - If content_type is "general" → transfer to `general_pipeline`
-  - If content_type is "maths" → transfer to `maths_pipeline`
+    STEP 2: Transfer to `master_pipeline` to process the script through the full pipeline.
+    - The pipeline will automatically handle: creative enhancement, TTS, image/Manim generation, QC, and final video composition.
 
-RULES:
-- ALWAYS call generate_script first as a tool.
-- ALWAYS transfer to a pipeline after getting the script. Never return the script as your final answer.
-- The pipeline will handle TTS, image generation, and video composition automatically.
-""",
+    RULES:
+    - ALWAYS call generate_script first as a tool.
+    - ALWAYS transfer to master_pipeline after getting the script. Never return the script as your final answer.
+    - The master_pipeline handles everything else automatically.
+    """,
     tools=[generate_script],
     output_key="script_output",
-    sub_agents=[general_pipeline, maths_pipeline],
+    sub_agents=[master_pipeline],
 )
