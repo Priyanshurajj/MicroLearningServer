@@ -1,66 +1,102 @@
+"""
+Creative Director Agent — uses Gemini 2.5 Flash to enhance script
+visual descriptions into production-grade prompts for Imagen and Manim.
+"""
 import json
+import logging
+
 from google.adk.agents import Agent
+from google import genai
+from .config import get_client, TEXT_MODEL, ROUTING_MODEL
+
+logger = logging.getLogger("EduReelADK")
+
+CREATIVE_ENHANCEMENT_PROMPT = """You are a Creative Director for an educational video production studio.
+
+You will receive a structured video script with segments. Your job is to enhance each segment's visual description into a production-grade prompt.
+
+FOR "general" SEGMENTS:
+- Rewrite the visual_description into a detailed, cinematic image generation prompt
+- Include: art style (modern flat design / 3D render / photorealistic), color palette, composition, lighting, mood
+- Add an "image_prompt" field with the full Imagen-ready prompt
+- Target aspect ratio: 9:16 (vertical reel)
+- The image should be educational, clean, and visually stunning
+
+FOR "maths" SEGMENTS:
+- Design a detailed Manim animation specification
+- Add a "manim_spec" field with:
+  - "scene_description": what the viewer should see
+  - "animations": list of animation steps (Write equations, Transform, FadeIn, etc.)
+  - "color_scheme": specific Manim color constants to use
+  - "math_elements": list of MathTex/Tex items to create
+- The specification should be detailed enough for code generation
+
+INPUT SCRIPT:
+{script_json}
+
+OUTPUT FORMAT (strict JSON — same structure as input, with added fields):
+Return the FULL script JSON with the original fields preserved and the new enhancement fields added to each segment.
+"""
 
 
 def enhance_visual_prompts(script_json: str) -> dict:
+    """Enhances script visual descriptions into production-grade image/Manim prompts."""
     try:
+        # Validate input
         script = json.loads(script_json)
-    except json.JSONDecodeError:
-        return {"status": "error", "error_message": "Invalid JSON provided to Creative Director."}
 
-    enhanced_segments = []
-    for seg in script.get("segments", []):
-        enhanced = {**seg}
+        prompt = CREATIVE_ENHANCEMENT_PROMPT.format(script_json=script_json)
 
-        if seg.get("segment_type") == "maths":
-            math_expr = seg.get("math_expression", "")
-            enhanced["manim_spec"] = {
-                "scene_type": "equation_animation",
-                "expression": math_expr,
-                "animation_style": "write_then_transform",
-                "color_scheme": "dark_background_white_text",
-                "description": f"Animate the expression: {math_expr}. "
-                               f"Show step-by-step derivation with smooth transitions.",
-            }
-            enhanced["enhanced_visual"] = (
-                f"Manim animation: {seg['visual_description']}. "
-                f"Use dark background with vibrant equation colors. "
-                f"Include geometric shapes if applicable."
-            )
-        else:
-            enhanced["enhanced_visual"] = (
-                f"Cinematic 4K illustration, documentary style, "
-                f"soft lighting, educational infographic aesthetic: "
-                f"{seg['visual_description']}. "
-                f"Color palette: warm earth tones with accent highlights. "
-                f"Include subtle depth-of-field blur on background elements."
-            )
-            enhanced["image_prompt"] = (
-                f"A high-quality educational illustration showing: "
-                f"{seg['visual_description']}. "
-                f"Style: modern flat design with subtle 3D elements, "
-                f"warm color palette, clean typography, "
-                f"aspect ratio 9:16 for mobile reel."
-            )
+        response = get_client().models.generate_content(
+            model=TEXT_MODEL,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.8,
+            ),
+        )
 
-        enhanced_segments.append(enhanced)
+        enhanced_script = json.loads(response.text)
 
-    enhanced_script = {**script, "segments": enhanced_segments}
-    return {"status": "success", "enhanced_script": json.dumps(enhanced_script)}
+        # Preserve run_id from original script
+        if "run_id" in script and "run_id" not in enhanced_script:
+            enhanced_script["run_id"] = script["run_id"]
+
+        general_count = sum(
+            1 for s in enhanced_script.get("segments", [])
+            if s.get("segment_type") == "general"
+        )
+        maths_count = sum(
+            1 for s in enhanced_script.get("segments", [])
+            if s.get("segment_type") == "maths"
+        )
+        logger.info(
+            f"Creative enhancement complete: {general_count} general, {maths_count} maths segments"
+        )
+
+        return {"status": "success", "enhanced_script": json.dumps(enhanced_script)}
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Creative Director received invalid JSON: {e}")
+        return {"status": "error", "error": f"Invalid JSON: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Creative enhancement failed: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 creative_director_agent = Agent(
     name="creative_director_agent",
-    model="gemini-3-flash-preview",
+    model=ROUTING_MODEL,
     description=(
-        "Enhances script segment visual descriptions into production-grade prompts: "
-        "cinematic image prompts for general segments and Manim code specs for maths segments."
+        "Enhances script visual descriptions into production-grade image prompts "
+        "for Imagen and Manim animation specifications."
     ),
     instruction=(
-        "You are the Creative Director Agent. You receive a script from 'script_output' "
-        "in the session state. Use the enhance_visual_prompts tool, passing the script JSON. "
+        "You are the Creative Director Agent. "
+        "Read the script JSON from the previous step's output in the conversation. "
+        "Call the enhance_visual_prompts tool with the full script JSON string. "
         "Return ONLY the raw JSON string from the tool's 'enhanced_script' field. "
-        "Do not add any extra commentary."
+        "Do not add any commentary."
     ),
     tools=[enhance_visual_prompts],
     output_key="enhanced_script",

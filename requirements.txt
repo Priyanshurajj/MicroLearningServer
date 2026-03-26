@@ -1,5 +1,10 @@
 google-adk
+google-genai
 fastapi
 uvicorn[standard]
 pydantic
 python-dotenv
+gTTS
+moviepy
+manim
+Pillow

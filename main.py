@@ -1,11 +1,13 @@
 import logging
+import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
+# Load env FIRST — agents/config.py reads env vars at import time
 load_dotenv()
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes import generate_router
 
 logging.basicConfig(
@@ -17,11 +19,11 @@ logging.basicConfig(
 app = FastAPI(
     title="EduReel ADK Server",
     description=(
-        "Educational reel video generation server powered by Google ADK. "
+        "Educational reel video generation server powered by Google ADK + Vertex AI. "
         "Submit transcript text and get an AI-generated educational reel video "
         "via a multi-agent pipeline."
     ),
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -33,6 +35,16 @@ app.add_middleware(
 )
 
 app.include_router(generate_router)
+
+
+@app.get("/health", tags=["System"])
+async def health():
+    return {
+        "status": "ok",
+        "vertex_project": os.getenv("GOOGLE_CLOUD_PROJECT", "not set"),
+        "vertex_location": os.getenv("GOOGLE_CLOUD_LOCATION", "not set"),
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
