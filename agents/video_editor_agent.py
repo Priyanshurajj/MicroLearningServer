@@ -1,10 +1,8 @@
-"""
-Video Editor Agent — uses MoviePy to compose the final educational reel
-by stitching static images and Manim video clips with TTS audio narration.
-"""
 import json
 import os
 import logging
+import subprocess
+import tempfile
 
 from google.adk.agents import Agent
 from moviepy import (
@@ -19,14 +17,12 @@ from .config import ROUTING_MODEL, OUTPUT_DIR
 
 logger = logging.getLogger("EduReelADK")
 
-# Reel dimensions (vertical 9:16)
 REEL_WIDTH = 1080
 REEL_HEIGHT = 1920
 FPS = 30
 
 
 def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) -> dict:
-    """Composes the final reel by combining images, Manim clips, and TTS audio."""
     try:
         script = json.loads(script_json)
         tts_data = json.loads(tts_json)
@@ -36,8 +32,8 @@ def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) ->
 
     run_id = script.get("run_id", qc_data.get("run_id", "default"))
     output_path = os.path.join(OUTPUT_DIR, run_id, "final_reel.mp4")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Build lookup maps
     segments = sorted(script.get("segments", []), key=lambda s: s["segment_id"])
     audio_map = {s["segment_id"]: s for s in tts_data.get("audio_segments", [])}
     asset_map = {a["segment_id"]: a for a in qc_data.get("qc_assets", [])}
@@ -67,33 +63,75 @@ def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) ->
                     "duration_seconds": round(audio_duration, 2),
                 })
                 current_time += audio_duration
-
         except Exception as e:
             logger.error(f"Failed to create clip for segment {seg_id}: {e}")
-            # Create a fallback black clip with audio
             fallback = _create_fallback_clip(audio_path, audio_duration)
             if fallback:
                 clips.append(fallback)
                 current_time += audio_duration
 
     if not clips:
-        return {"status": "error", "error": "No clips were created. Cannot compose video."}
+        return {"status": "error", "error": "No clips were created."}
 
-    # Concatenate all clips into the final video
+    # ── Write video using subprocess FFmpeg (avoids pipe deadlock) ──
     try:
         final_video = concatenate_videoclips(clips, method="compose")
-        final_video.write_videofile(
-            output_path,
+
+        # Step 1: Write a temporary raw video (no audio) using imageio
+        # This avoids the FFmpeg pipe deadlock that write_videofile causes
+        temp_video = os.path.join(os.path.dirname(output_path), "temp_video.mp4")
+        temp_audio = os.path.join(os.path.dirname(output_path), "temp_audio.mp3")
+
+        # Write video without audio first — uses imageio internally, no pipe issues
+        final_video.without_audio().write_videofile(
+            temp_video,
             fps=FPS,
             codec="libx264",
-            audio_codec="aac",
-            logger=None,  # Suppress MoviePy progress bars
+            logger="bar",  # MUST keep "bar" — None causes FFmpeg pipe deadlock
         )
-        final_video.close()
 
-        # Clean up individual clips
+        # Write concatenated audio separately
+        if final_video.audio is not None:
+            final_video.audio.write_audiofile(temp_audio, logger="bar")
+
+        final_video.close()
         for clip in clips:
             clip.close()
+
+        # Step 2: Merge video + audio with FFmpeg subprocess (non-blocking, clean pipes)
+        if os.path.exists(temp_audio):
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", temp_video,
+                "-i", temp_audio,
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-shortest",
+                output_path,
+            ]
+        else:
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", temp_video,
+                "-c:v", "copy",
+                output_path,
+            ]
+
+        result = subprocess.run(
+            ffmpeg_cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+        # Cleanup temp files
+        for f in [temp_video, temp_audio]:
+            if os.path.exists(f):
+                os.remove(f)
+
+        if result.returncode != 0:
+            logger.error(f"FFmpeg merge failed: {result.stderr[:500]}")
+            return {"status": "error", "error": f"FFmpeg merge failed: {result.stderr[:300]}"}
 
         logger.info(f"Final video composed: {output_path} ({current_time:.1f}s)")
 
@@ -117,16 +155,13 @@ def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) ->
 
 
 def _create_segment_clip(seg, asset_info, audio_path, duration):
-    """Creates a MoviePy clip for a single segment."""
     asset_type = asset_info.get("asset_type", "")
 
     if asset_type == "manim_video" and asset_info.get("status") == "rendered":
         video_path = asset_info.get("video_path", "")
         if video_path and os.path.exists(video_path):
             clip = VideoFileClip(video_path)
-            # Resize to reel dimensions
             clip = clip.resize(height=REEL_HEIGHT)
-            # Pad or crop width to match
             if clip.w != REEL_WIDTH:
                 clip = clip.resize(width=REEL_WIDTH)
         else:
@@ -148,10 +183,9 @@ def _create_segment_clip(seg, asset_info, audio_path, duration):
     else:
         clip = _create_fallback_clip(audio_path, duration)
 
-    # Attach audio if available
+    # Attach audio
     if clip and audio_path and os.path.exists(audio_path):
         audio = AudioFileClip(audio_path)
-        # Match clip duration to audio
         if abs(clip.duration - audio.duration) > 0.5:
             clip = clip.set_duration(audio.duration)
         clip = clip.set_audio(audio)
@@ -160,10 +194,9 @@ def _create_segment_clip(seg, asset_info, audio_path, duration):
 
 
 def _create_fallback_clip(audio_path, duration):
-    """Creates a black background clip as fallback."""
     clip = ColorClip(
         size=(REEL_WIDTH, REEL_HEIGHT),
-        color=(20, 20, 30),  # Near-black blue
+        color=(20, 20, 30),
         duration=duration,
     )
     return clip
@@ -190,3 +223,4 @@ video_editor_agent = Agent(
     tools=[compose_final_video],
     output_key="video_output",
 )
+

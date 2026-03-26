@@ -1,7 +1,3 @@
-"""
-Script Generation Agent — uses Gemini 2.5 Flash to produce a structured
-educational script with per-segment type tagging (general / maths).
-"""
 import json
 import uuid
 import os

@@ -1,7 +1,3 @@
-"""
-Creative Director Agent — uses Gemini 2.5 Flash to enhance script
-visual descriptions into production-grade prompts for Imagen and Manim.
-"""
 import json
 import logging
 
@@ -40,7 +36,6 @@ Return the FULL script JSON with the original fields preserved and the new enhan
 
 
 def enhance_visual_prompts(script_json: str) -> dict:
-    """Enhances script visual descriptions into production-grade image/Manim prompts."""
     try:
         # Validate input
         script = json.loads(script_json)

@@ -1,13 +1,3 @@
-"""
-EduReel ADK Pipeline — Root Orchestrator
-
-Architecture: SequentialAgent root (no LLM routing overhead).
-Every video goes through the same pipeline; mixed general + maths
-segments are handled per-segment by each agent.
-
-Pipeline:
-  script_agent → creative_director → (TTS || Visuals) → Manim QC → Video Editor
-"""
 from google.adk.agents import SequentialAgent, ParallelAgent
 
 from .script_generation_agent import script_agent
@@ -17,9 +7,6 @@ from .visual_asset_agent import visual_asset_agent
 from .manim_qc_agent import manim_qc_agent
 from .video_editor_agent import video_editor_agent
 
-# ── Parallel Asset Generation (TTS + Visuals run simultaneously) ──
-# Vertex AI has high rate limits, so ParallelAgent is safe.
-# If on free-tier API, switch to SequentialAgent.
 asset_generator = ParallelAgent(
     name="asset_generator",
     description=(

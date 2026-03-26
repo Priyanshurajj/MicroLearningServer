@@ -36,16 +36,6 @@ app.add_middleware(
 
 app.include_router(generate_router)
 
-
-@app.get("/health", tags=["System"])
-async def health():
-    return {
-        "status": "ok",
-        "vertex_project": os.getenv("GOOGLE_CLOUD_PROJECT", "not set"),
-        "vertex_location": os.getenv("GOOGLE_CLOUD_LOCATION", "not set"),
-    }
-
-
 if __name__ == "__main__":
     import uvicorn
 

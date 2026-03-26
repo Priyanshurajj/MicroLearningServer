@@ -1,7 +1,3 @@
-"""
-Visual Asset Agent — generates images via Imagen 3 for general segments
-and Manim Python code via Gemini 2.5 Pro for maths segments.
-"""
 import json
 import os
 import io
@@ -45,7 +41,6 @@ Return ONLY the Python code. No explanations, no markdown code blocks.
 
 
 def generate_visual_assets(script_json: str) -> dict:
-    """Generates images (Imagen) for general segments and Manim code (Gemini 2.5 Pro) for maths segments."""
     try:
         script = json.loads(script_json)
     except json.JSONDecodeError:
@@ -88,7 +83,6 @@ def generate_visual_assets(script_json: str) -> dict:
 
 
 def _generate_image(seg: dict, images_dir: str) -> dict:
-    """Generates an image using Imagen 3 for a general segment."""
     seg_id = seg["segment_id"]
     output_path = os.path.join(images_dir, f"segment_{seg_id}.png")
 
@@ -147,7 +141,6 @@ def _generate_image(seg: dict, images_dir: str) -> dict:
 
 
 def _generate_manim_code(seg: dict, manim_dir: str) -> dict:
-    """Generates Manim Python code using Gemini 2.5 Pro for a maths segment."""
     seg_id = seg["segment_id"]
     code_path = os.path.join(manim_dir, f"segment_{seg_id}.py")
 

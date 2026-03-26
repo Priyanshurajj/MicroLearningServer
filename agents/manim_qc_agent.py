@@ -1,8 +1,3 @@
-"""
-Manim QC Agent — Executes generated Manim code in a subprocess,
-catches errors, and uses Gemini 2.5 Pro to auto-heal broken code.
-Passes through image assets unchanged.
-"""
 import json
 import os
 import subprocess
@@ -41,7 +36,6 @@ Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 
 
 def execute_manim_qc(visual_output_json: str) -> dict:
-    """Executes Manim code for maths segments with auto-healing on failure."""
     try:
         visual_data = json.loads(visual_output_json)
     except json.JSONDecodeError:

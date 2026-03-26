@@ -1,6 +1,3 @@
-"""
-TTS Agent — uses gTTS to generate MP3 audio narration for every segment.
-"""
 import json
 import os
 import logging
@@ -15,7 +12,6 @@ logger = logging.getLogger("EduReelADK")
 
 
 def generate_tts_audio(script_json: str) -> dict:
-    """Generates TTS audio files for all segments using Google Text-to-Speech."""
     try:
         script = json.loads(script_json)
     except json.JSONDecodeError:
