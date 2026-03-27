@@ -86,7 +86,9 @@ def generate_visual_assets(tool_context: ToolContext) -> dict:
         f"{result['maths_clips']} Manim scripts generated"
     )
 
-    return {"status": "success", "visual_output": json.dumps(result)}
+    visual_output_json = json.dumps(result)
+    tool_context.state["visual_output"] = visual_output_json
+    return {"status": "success", "visual_output": visual_output_json}
 
 
 def _generate_image(seg: dict, images_dir: str) -> dict:
@@ -219,5 +221,4 @@ visual_asset_agent = Agent(
         "No parameters needed. Return the tool's output as-is."
     ),
     tools=[generate_visual_assets],
-    output_key="visual_output",
 )

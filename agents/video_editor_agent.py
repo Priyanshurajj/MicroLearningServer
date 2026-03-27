@@ -13,6 +13,7 @@ from moviepy import (
     concatenate_videoclips,
     ColorClip,
 )
+import imageio_ffmpeg
 
 from .config import ROUTING_MODEL, OUTPUT_DIR
 
@@ -112,9 +113,11 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             clip.close()
 
         # Step 2: Merge video + audio with FFmpeg subprocess (non-blocking, clean pipes)
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        
         if os.path.exists(temp_audio):
             ffmpeg_cmd = [
-                "ffmpeg", "-y",
+                ffmpeg_exe, "-y",
                 "-i", temp_video,
                 "-i", temp_audio,
                 "-c:v", "copy",
@@ -124,7 +127,7 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             ]
         else:
             ffmpeg_cmd = [
-                "ffmpeg", "-y",
+                ffmpeg_exe, "-y",
                 "-i", temp_video,
                 "-c:v", "copy",
                 output_path,
@@ -160,7 +163,9 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             "maths_clips": sum(1 for t in timeline if t["segment_type"] == "maths"),
         }
 
-        return {"status": "success", "video_output": json.dumps(video_result)}
+        video_output_json = json.dumps(video_result)
+        tool_context.state["video_output"] = video_output_json
+        return {"status": "success", "video_output": video_output_json}
 
     except Exception as e:
         logger.error(f"Video composition failed: {e}")
@@ -174,9 +179,9 @@ def _create_segment_clip(seg, asset_info, audio_path, duration):
         video_path = asset_info.get("video_path", "")
         if video_path and os.path.exists(video_path):
             clip = VideoFileClip(video_path)
-            clip = clip.resize(height=REEL_HEIGHT)
+            clip = clip.resized(height=REEL_HEIGHT)
             if clip.w != REEL_WIDTH:
-                clip = clip.resize(width=REEL_WIDTH)
+                clip = clip.resized(width=REEL_WIDTH)
         else:
             clip = _create_fallback_clip(audio_path, duration)
 
@@ -184,13 +189,13 @@ def _create_segment_clip(seg, asset_info, audio_path, duration):
         image_path = asset_info.get("image_file_path", "")
         if image_path and os.path.exists(image_path):
             clip = ImageClip(image_path, duration=duration)
-            clip = clip.resize(height=REEL_HEIGHT)
+            clip = clip.resized(height=REEL_HEIGHT)
             if clip.w != REEL_WIDTH:
-                clip = clip.resize(width=REEL_WIDTH)
+                clip = clip.resized(width=REEL_WIDTH)
 
             # Ken Burns effect: slow zoom in
-            clip = clip.resize(lambda t: 1 + 0.03 * t)
-            clip = clip.set_duration(duration)
+            clip = clip.resized(lambda t: 1 + 0.03 * t)
+            clip = clip.with_duration(duration)
         else:
             clip = _create_fallback_clip(audio_path, duration)
     else:
@@ -200,8 +205,8 @@ def _create_segment_clip(seg, asset_info, audio_path, duration):
     if clip and audio_path and os.path.exists(audio_path):
         audio = AudioFileClip(audio_path)
         if abs(clip.duration - audio.duration) > 0.5:
-            clip = clip.set_duration(audio.duration)
-        clip = clip.set_audio(audio)
+            clip = clip.with_duration(audio.duration)
+        clip = clip.with_audio(audio)
 
     return clip
 
@@ -228,6 +233,5 @@ video_editor_agent = Agent(
         "No parameters needed. Return the tool's output as-is."
     ),
     tools=[compose_final_video],
-    output_key="video_output",
 )
 

@@ -71,7 +71,9 @@ def enhance_visual_prompts(tool_context: ToolContext) -> dict:
             f"Creative enhancement complete: {general_count} general, {maths_count} maths segments"
         )
 
-        return {"status": "success", "enhanced_script": json.dumps(enhanced_script)}
+        enhanced_script_json = json.dumps(enhanced_script)
+        tool_context.state["enhanced_script"] = enhanced_script_json
+        return {"status": "success", "enhanced_script": enhanced_script_json}
 
     except json.JSONDecodeError as e:
         logger.error(f"Creative Director received invalid JSON: {e}")
@@ -94,5 +96,4 @@ creative_director_agent = Agent(
         "No parameters needed. Return the tool's output as-is."
     ),
     tools=[enhance_visual_prompts],
-    output_key="enhanced_script",
 )

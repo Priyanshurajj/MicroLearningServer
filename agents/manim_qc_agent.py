@@ -77,7 +77,9 @@ def execute_manim_qc(tool_context: ToolContext) -> dict:
         f"{output['manim_failed']} failed, {output['images_passed']} images passed"
     )
 
-    return {"status": "success", "qc_output": json.dumps(output)}
+    qc_output_json = json.dumps(output)
+    tool_context.state["qc_output"] = qc_output_json
+    return {"status": "success", "qc_output": qc_output_json}
 
 
 def _render_manim_with_retry(asset: dict, run_id: str) -> dict:
@@ -238,5 +240,4 @@ manim_qc_agent = Agent(
         "No parameters needed. Return the tool's output as-is."
     ),
     tools=[execute_manim_qc],
-    output_key="qc_output",
 )

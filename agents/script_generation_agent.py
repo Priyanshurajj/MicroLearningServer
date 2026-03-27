@@ -4,6 +4,7 @@ import os
 import logging
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from google import genai
 from .config import get_client, TEXT_MODEL, ROUTING_MODEL, OUTPUT_DIR
 
@@ -54,7 +55,7 @@ OUTPUT FORMAT (strict JSON):
 """
 
 
-def generate_script(transcript: str) -> dict:
+def generate_script(transcript: str, tool_context: ToolContext) -> dict:
     """Generates a structured educational video script from a transcript using Gemini."""
     try:
         prompt = SCRIPT_GENERATION_PROMPT.format(transcript=transcript)
@@ -85,7 +86,9 @@ def generate_script(transcript: str) -> dict:
             f"run_id={run_id}"
         )
 
-        return {"status": "success", "script": json.dumps(script_data)}
+        script_json_str = json.dumps(script_data)
+        tool_context.state["script_output"] = script_json_str
+        return {"status": "success", "script": script_json_str}
 
     except json.JSONDecodeError as e:
         logger.error(f"Script generation returned invalid JSON: {e}")
@@ -107,5 +110,4 @@ script_agent = Agent(
         "Do not add any commentary, formatting, or markdown."
     ),
     tools=[generate_script],
-    output_key="script_output",
 )

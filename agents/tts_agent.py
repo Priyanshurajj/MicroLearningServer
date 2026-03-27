@@ -76,7 +76,9 @@ def generate_tts_audio(tool_context: ToolContext) -> dict:
         f"total {tts_result['total_duration_seconds']}s"
     )
 
-    return {"status": "success", "tts_output": json.dumps(tts_result)}
+    tts_output_json = json.dumps(tts_result)
+    tool_context.state["tts_output"] = tts_output_json
+    return {"status": "success", "tts_output": tts_output_json}
 
 
 tts_agent = Agent(
@@ -89,5 +91,4 @@ tts_agent = Agent(
         "No parameters needed. Return the tool's output as-is."
     ),
     tools=[generate_tts_audio],
-    output_key="tts_output",
 )
