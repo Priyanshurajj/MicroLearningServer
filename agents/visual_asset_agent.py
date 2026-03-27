@@ -4,6 +4,7 @@ import io
 import logging
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from google import genai
 from PIL import Image
 
@@ -40,11 +41,17 @@ Return ONLY the Python code. No explanations, no markdown code blocks.
 """
 
 
-def generate_visual_assets(script_json: str) -> dict:
+def generate_visual_assets(tool_context: ToolContext) -> dict:
+    """Reads enhanced_script from session state and generates visuals."""
+    script_json = tool_context.state.get("enhanced_script", "")
+    if not script_json:
+        script_json = tool_context.state.get("script_output", "")
+
     try:
         script = json.loads(script_json)
-    except json.JSONDecodeError:
-        return {"status": "error", "error": "Invalid JSON provided to Visual Asset agent."}
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"Visual assets: Cannot parse script from state: {e}")
+        return {"status": "error", "error": f"Cannot parse script from state: {e}"}
 
     run_id = script.get("run_id", "default")
     images_dir = os.path.join(OUTPUT_DIR, run_id, "images")
@@ -86,12 +93,10 @@ def _generate_image(seg: dict, images_dir: str) -> dict:
     seg_id = seg["segment_id"]
     output_path = os.path.join(images_dir, f"segment_{seg_id}.png")
 
-    # Use the enhanced image_prompt if available, otherwise fall back
     prompt = seg.get("image_prompt",
                 seg.get("enhanced_visual",
                     seg.get("visual_description", "Educational illustration")))
 
-    # Ensure the prompt is Imagen-safe (truncate if too long)
     prompt = prompt[:1000]
 
     try:
@@ -106,11 +111,10 @@ def _generate_image(seg: dict, images_dir: str) -> dict:
 
         if response.generated_images:
             image_data = response.generated_images[0].image
-            # Save using PIL for reliability
             pil_image = Image.open(io.BytesIO(image_data.image_bytes))
             pil_image.save(output_path, "PNG")
 
-            logger.info(f"Image generated for segment {seg_id} → {output_path}")
+            logger.info(f"Image generated for segment {seg_id}")
 
             return {
                 "segment_id": seg_id,
@@ -144,7 +148,6 @@ def _generate_manim_code(seg: dict, manim_dir: str) -> dict:
     seg_id = seg["segment_id"]
     code_path = os.path.join(manim_dir, f"segment_{seg_id}.py")
 
-    # Build the Manim spec string if available
     manim_spec_str = ""
     if "manim_spec" in seg:
         manim_spec_str = f"- Manim Specification: {json.dumps(seg['manim_spec'], indent=2)}"
@@ -163,13 +166,12 @@ def _generate_manim_code(seg: dict, manim_dir: str) -> dict:
             model=CODE_MODEL,
             contents=prompt,
             config=genai.types.GenerateContentConfig(
-                temperature=0.2,  # Low temperature for precise code
+                temperature=0.2,
             ),
         )
 
         code = response.text.strip()
 
-        # Strip markdown code fences if Gemini adds them
         if code.startswith("```python"):
             code = code[len("```python"):].strip()
         if code.startswith("```"):
@@ -177,11 +179,10 @@ def _generate_manim_code(seg: dict, manim_dir: str) -> dict:
         if code.endswith("```"):
             code = code[:-3].strip()
 
-        # Write the Python file
         with open(code_path, "w", encoding="utf-8") as f:
             f.write(code)
 
-        logger.info(f"Manim code generated for segment {seg_id} → {code_path}")
+        logger.info(f"Manim code generated for segment {seg_id}")
 
         return {
             "segment_id": seg_id,
@@ -214,10 +215,8 @@ visual_asset_agent = Agent(
     ),
     instruction=(
         "You are the Visual Asset Agent. "
-        "Read the enhanced script JSON from the previous step's output in the conversation. "
-        "Call the generate_visual_assets tool with the full script JSON string. "
-        "Return ONLY the raw JSON string from the tool's 'visual_output' field. "
-        "Do not add any commentary."
+        "Call the generate_visual_assets tool immediately — it reads all data from session state automatically. "
+        "No parameters needed. Return the tool's output as-is."
     ),
     tools=[generate_visual_assets],
     output_key="visual_output",

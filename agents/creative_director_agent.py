@@ -2,6 +2,7 @@ import json
 import logging
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from google import genai
 from .config import get_client, TEXT_MODEL, ROUTING_MODEL
 
@@ -35,9 +36,11 @@ Return the FULL script JSON with the original fields preserved and the new enhan
 """
 
 
-def enhance_visual_prompts(script_json: str) -> dict:
+def enhance_visual_prompts(tool_context: ToolContext) -> dict:
+    """Reads script_output from session state and enhances visual prompts."""
+    script_json = tool_context.state.get("script_output", "")
+
     try:
-        # Validate input
         script = json.loads(script_json)
 
         prompt = CREATIVE_ENHANCEMENT_PROMPT.format(script_json=script_json)
@@ -53,7 +56,6 @@ def enhance_visual_prompts(script_json: str) -> dict:
 
         enhanced_script = json.loads(response.text)
 
-        # Preserve run_id from original script
         if "run_id" in script and "run_id" not in enhanced_script:
             enhanced_script["run_id"] = script["run_id"]
 
@@ -88,10 +90,8 @@ creative_director_agent = Agent(
     ),
     instruction=(
         "You are the Creative Director Agent. "
-        "Read the script JSON from the previous step's output in the conversation. "
-        "Call the enhance_visual_prompts tool with the full script JSON string. "
-        "Return ONLY the raw JSON string from the tool's 'enhanced_script' field. "
-        "Do not add any commentary."
+        "Call the enhance_visual_prompts tool immediately — it reads all data from session state automatically. "
+        "No parameters needed. Return the tool's output as-is."
     ),
     tools=[enhance_visual_prompts],
     output_key="enhanced_script",

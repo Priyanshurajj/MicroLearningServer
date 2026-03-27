@@ -17,7 +17,7 @@ def get_client() -> genai.Client:
     """Returns a cached Vertex AI genai client. Created on first call."""
     global _client
     if _client is None:
-        use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").upper() == "TRUE"
+        use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").upper() in ("TRUE", "1")
 
         if use_vertex:
             _client = genai.Client(
@@ -40,7 +40,7 @@ def get_client() -> genai.Client:
 
 # ── Model Constants ──
 # ADK agent routing — fast, cheap, just decides which tool to call
-ROUTING_MODEL = "gemini-2.0-flash"
+ROUTING_MODEL = "gemini-2.5-flash"
 
 # Script + creative work — good reasoning + fast
 TEXT_MODEL = "gemini-2.5-flash"

@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from moviepy import (
     ImageClip,
     VideoFileClip,
@@ -22,12 +23,13 @@ REEL_HEIGHT = 1920
 FPS = 30
 
 
-def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) -> dict:
+def compose_final_video(tool_context: ToolContext) -> dict:
+    """Reads enhanced_script, tts_output, qc_output from session state."""
     try:
-        script = json.loads(script_json)
-        tts_data = json.loads(tts_json)
-        qc_data = json.loads(qc_output_json)
-    except json.JSONDecodeError as e:
+        script = json.loads(tool_context.state.get("enhanced_script", "{}"))
+        tts_data = json.loads(tool_context.state.get("tts_output", "{}"))
+        qc_data = json.loads(tool_context.state.get("qc_output", "{}"))
+    except (json.JSONDecodeError, TypeError) as e:
         return {"status": "error", "error": f"Invalid JSON provided to Video Editor: {e}"}
 
     run_id = script.get("run_id", qc_data.get("run_id", "default"))
@@ -35,8 +37,19 @@ def compose_final_video(script_json: str, tts_json: str, qc_output_json: str) ->
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     segments = sorted(script.get("segments", []), key=lambda s: s["segment_id"])
-    audio_map = {s["segment_id"]: s for s in tts_data.get("audio_segments", [])}
-    asset_map = {a["segment_id"]: a for a in qc_data.get("qc_assets", [])}
+
+    # Normalize paths that may have been double-escaped through JSON layers
+    audio_map = {}
+    for s in tts_data.get("audio_segments", []):
+        s["audio_file_path"] = os.path.normpath(s.get("audio_file_path", ""))
+        audio_map[s["segment_id"]] = s
+
+    asset_map = {}
+    for a in qc_data.get("qc_assets", []):
+        for key in ("image_file_path", "video_path"):
+            if key in a:
+                a[key] = os.path.normpath(a[key])
+        asset_map[a["segment_id"]] = a
 
     clips = []
     timeline = []
@@ -211,14 +224,8 @@ video_editor_agent = Agent(
     ),
     instruction=(
         "You are the Video Editor Agent. "
-        "You need three inputs from the conversation: "
-        "1) The enhanced script JSON, "
-        "2) The TTS output JSON, "
-        "3) The QC output JSON. "
-        "Call the compose_final_video tool with script_json, tts_json, "
-        "and qc_output_json from the conversation context. "
-        "Return ONLY the raw JSON string from the tool's 'video_output' field. "
-        "Do not add any commentary."
+        "Call the compose_final_video tool immediately — it reads all data from session state automatically. "
+        "No parameters needed. Return the tool's output as-is."
     ),
     tools=[compose_final_video],
     output_key="video_output",

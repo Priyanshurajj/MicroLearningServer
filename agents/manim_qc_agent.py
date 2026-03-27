@@ -4,6 +4,7 @@ import subprocess
 import logging
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from google import genai
 from .config import get_client, CODE_MODEL, ROUTING_MODEL, OUTPUT_DIR
 
@@ -35,11 +36,14 @@ Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 """
 
 
-def execute_manim_qc(visual_output_json: str) -> dict:
+def execute_manim_qc(tool_context: ToolContext) -> dict:
+    """Reads visual_output from session state and executes Manim QC."""
+    visual_output_json = tool_context.state.get("visual_output", "")
     try:
         visual_data = json.loads(visual_output_json)
-    except json.JSONDecodeError:
-        return {"status": "error", "error": "Invalid JSON provided to Manim QC agent."}
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"Manim QC: Cannot parse visual_output from state: {e}")
+        return {"status": "error", "error": f"Cannot parse visual_output from state: {e}"}
 
     run_id = visual_data.get("run_id", "default")
     assets = visual_data.get("visual_assets", [])
@@ -230,10 +234,8 @@ manim_qc_agent = Agent(
     ),
     instruction=(
         "You are the Manim QC Agent. "
-        "Read the visual output JSON from the previous step's output in the conversation. "
-        "Call the execute_manim_qc tool with the full visual output JSON string. "
-        "Return ONLY the raw JSON string from the tool's 'qc_output' field. "
-        "Do not add any commentary."
+        "Call the execute_manim_qc tool immediately — it reads all data from session state automatically. "
+        "No parameters needed. Return the tool's output as-is."
     ),
     tools=[execute_manim_qc],
     output_key="qc_output",

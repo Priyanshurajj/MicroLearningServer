@@ -3,6 +3,7 @@ import os
 import logging
 
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 from gtts import gTTS
 from moviepy import AudioFileClip
 
@@ -11,11 +12,17 @@ from .config import ROUTING_MODEL, OUTPUT_DIR
 logger = logging.getLogger("EduReelADK")
 
 
-def generate_tts_audio(script_json: str) -> dict:
+def generate_tts_audio(tool_context: ToolContext) -> dict:
+    """Reads enhanced_script from session state and generates TTS audio for all segments."""
+    script_json = tool_context.state.get("enhanced_script", "")
+    if not script_json:
+        script_json = tool_context.state.get("script_output", "")
+
     try:
         script = json.loads(script_json)
-    except json.JSONDecodeError:
-        return {"status": "error", "error": "Invalid script JSON provided to TTS agent."}
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"TTS: Cannot parse script from state: {e}")
+        return {"status": "error", "error": f"Cannot parse script from state: {e}"}
 
     run_id = script.get("run_id", "default")
     audio_dir = os.path.join(OUTPUT_DIR, run_id, "audio")
@@ -33,7 +40,6 @@ def generate_tts_audio(script_json: str) -> dict:
             tts = gTTS(text=narration, lang="en", slow=False)
             tts.save(output_path)
 
-            # Read the actual audio duration using MoviePy
             audio_clip = AudioFileClip(output_path)
             actual_duration = audio_clip.duration
             audio_clip.close()
@@ -45,9 +51,7 @@ def generate_tts_audio(script_json: str) -> dict:
                 "narration_preview": narration[:80],
             })
 
-            logger.info(
-                f"TTS segment {seg_id}: {actual_duration:.1f}s → {output_path}"
-            )
+            logger.info(f"TTS segment {seg_id}: {actual_duration:.1f}s")
 
         except Exception as e:
             logger.error(f"TTS failed for segment {seg_id}: {e}")
@@ -81,10 +85,8 @@ tts_agent = Agent(
     description="Generates text-to-speech audio narration for all segments.",
     instruction=(
         "You are the TTS Agent. "
-        "Read the enhanced script JSON from the previous step's output in the conversation. "
-        "Call the generate_tts_audio tool with the full script JSON string. "
-        "Return ONLY the raw JSON string from the tool's 'tts_output' field. "
-        "Do not add any commentary."
+        "Call the generate_tts_audio tool immediately — it reads all data from session state automatically. "
+        "No parameters needed. Return the tool's output as-is."
     ),
     tools=[generate_tts_audio],
     output_key="tts_output",
