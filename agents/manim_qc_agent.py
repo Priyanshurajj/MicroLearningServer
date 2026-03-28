@@ -150,6 +150,7 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
             [
                 "python", "-m", "manim", "render",
                 "-ql",  # Low quality for speed
+                "--progress_bar", "display",
                 "--format", "mp4",
                 "--media_dir", output_dir,
                 code_path,

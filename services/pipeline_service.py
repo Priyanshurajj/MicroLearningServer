@@ -68,7 +68,7 @@ async def _execute_pipeline(
                     content_text += f"[TOOL RESPONSE: {part.function_response.name}]"
 
         status_tag = "FINAL" if is_final else ""
-        preview = content_text[:200] + ("..." if len(content_text) > 200 else "")
+        preview = content_text + ("..." if len(content_text) > 200 else "")
         logger.info(f"Agent: {agent_name} | Author: {author}{status_tag}")
         logger.info(f"Content: {preview}")
 
