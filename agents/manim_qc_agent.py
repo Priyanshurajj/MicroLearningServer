@@ -39,11 +39,16 @@ Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 def execute_manim_qc(tool_context: ToolContext) -> dict:
     """Reads visual_output from session state and executes Manim QC."""
     visual_output_json = tool_context.state.get("visual_output", "")
+    enhanced_script_json = tool_context.state.get("enhanced_script", "{}")
+    if not enhanced_script_json:
+        enhanced_script_json = tool_context.state.get("script_output", "{}")
+
     try:
         visual_data = json.loads(visual_output_json)
+        script_data = json.loads(enhanced_script_json)
     except (json.JSONDecodeError, TypeError) as e:
-        logger.error(f"Manim QC: Cannot parse visual_output from state: {e}")
-        return {"status": "error", "error": f"Cannot parse visual_output from state: {e}"}
+        logger.error(f"Manim QC: Cannot parse state: {e}")
+        return {"status": "error", "error": f"Cannot parse state: {e}"}
 
     run_id = visual_data.get("run_id", "default")
     assets = visual_data.get("visual_assets", [])
@@ -51,7 +56,7 @@ def execute_manim_qc(tool_context: ToolContext) -> dict:
 
     for asset in assets:
         if asset.get("asset_type") == "manim_code":
-            result = _render_manim_with_retry(asset, run_id)
+            result = _render_manim_with_retry(asset, run_id, script_data)
             qc_results.append(result)
         else:
             # Pass through image assets unchanged
@@ -82,8 +87,8 @@ def execute_manim_qc(tool_context: ToolContext) -> dict:
     return {"status": "success", "qc_output": qc_output_json}
 
 
-def _render_manim_with_retry(asset: dict, run_id: str) -> dict:
-    """Attempt to render Manim code, auto-fix on failure up to MAX_FIX_ATTEMPTS times."""
+def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dict:
+    """Attempt to render Manim code, auto-fix on failure up to MAX_FIX_ATTEMPTS times, then fallback."""
     code_path = asset.get("code_file_path", "")
     scene_name = asset.get("scene_name", "")
     seg_id = asset.get("segment_id")
@@ -122,7 +127,6 @@ def _render_manim_with_retry(asset: dict, run_id: str) -> dict:
                     "render_attempts": attempt,
                 }
 
-        # If not last attempt, try to fix the code
         if attempt < MAX_FIX_ATTEMPTS:
             logger.warning(
                 f"Manim render failed for segment {seg_id} (attempt {attempt}). "
@@ -133,14 +137,96 @@ def _render_manim_with_retry(asset: dict, run_id: str) -> dict:
                 logger.error(f"Auto-fix failed for segment {seg_id}")
                 break
 
+    # If all 3 attempts fail, try fallback static text animation
+    logger.warning(
+        f"Manim render failed all {MAX_FIX_ATTEMPTS} attempts for segment {seg_id}. "
+        f"Generating fallback generic Manim script..."
+    )
+    
+    fallback_code = _generate_fallback_manim_code(asset, script_data)
+    with open(code_path, "w", encoding="utf-8") as f:
+        f.write(fallback_code)
+    
+    logger.info(f"Rendering fallback script for segment {seg_id}...")
+    success, error_output = _run_manim_render(code_path, scene_name, manim_dir)
+    
+    if success:
+        rendered_path = _find_rendered_video(manim_dir, scene_name)
+        if rendered_path:
+            if rendered_path != output_video:
+                os.replace(rendered_path, output_video)
+            logger.info(f"Fallback Manim segment {seg_id} rendered successfully")
+            return {
+                "segment_id": seg_id,
+                "asset_type": "manim_video",
+                "video_path": os.path.abspath(output_video),
+                "status": "rendered",
+                "render_attempts": MAX_FIX_ATTEMPTS + 1,
+                "is_fallback": True,
+            }
+
     return {
         "segment_id": seg_id,
         "asset_type": "manim_video",
         "video_path": "",
         "status": "failed",
-        "error": f"Failed after {MAX_FIX_ATTEMPTS} attempts. Last error: {error_output[:500]}",
-        "render_attempts": MAX_FIX_ATTEMPTS,
+        "error": f"Failed after {MAX_FIX_ATTEMPTS} attempts and fallback. Last error: {error_output[:500]}",
+        "render_attempts": MAX_FIX_ATTEMPTS + 1,
     }
+
+def _generate_fallback_manim_code(asset: dict, script_data: dict) -> str:
+    """Generates a reliable fallback Scene matching video_generator.py logic."""
+    seg_id = asset.get("segment_id")
+    scene_name = asset.get("scene_name", f"Segment{seg_id}Scene")
+    
+    # Find the corresponding text in the script
+    segments = script_data.get("segments", [])
+    target_seg = next((s for s in segments if s.get("segment_id") == seg_id), {})
+    narration = target_seg.get("narration", "Educational Content")
+    title = script_data.get("title", f"Segment {seg_id}")
+    
+    # Escape quotes
+    narration = narration.replace('"', '\\"').replace('\n', ' ')
+    title = title.replace('"', '\\"').replace('\n', ' ')
+
+    return f'''from manim import *
+import textwrap
+
+class {scene_name}(Scene):
+    def construct(self):
+        # Fallback static text animation
+        card = RoundedRectangle(
+            corner_radius=0.4,
+            width=12,
+            height=6,
+            fill_color="#0f3460",
+            fill_opacity=0.3,
+            stroke_color="#e94560",
+            stroke_width=2,
+        )
+        self.add(card)
+
+        title_text = "{title}"
+        content_text = "{narration}"
+
+        wrapped_title = textwrap.fill(title_text, width=30)
+        title_obj = Text(wrapped_title, font_size=40, color=WHITE, weight="BOLD")
+        title_obj.move_to(ORIGIN).shift(UP * 2)
+
+        accent_bar = Line(LEFT * 3, RIGHT * 3, color="#e94560", stroke_width=4)
+        accent_bar.next_to(title_obj, DOWN, buff=0.3)
+
+        wrapped_content = textwrap.fill(content_text, width=40)
+        content_obj = Text(wrapped_content, font_size=32, color=LIGHT_GREY, line_spacing=0.8)
+        content_obj.next_to(accent_bar, DOWN, buff=0.8)
+
+        self.play(FadeIn(card, shift=UP * 0.3), run_time=0.5)
+        self.play(Write(title_obj), run_time=1.0)
+        self.play(Create(accent_bar), run_time=0.5)
+        self.play(FadeIn(content_obj, shift=UP * 0.3), run_time=1.0)
+
+        self.wait(1.5)
+'''
 
 
 def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple[bool, str]:
@@ -162,10 +248,21 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
             cwd=os.path.dirname(code_path),
         )
 
+        log_file = os.path.join(output_dir, f"manim_{scene_name}_exec.log")
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"--- Manim Render Output for {scene_name} ---\n")
+            f.write("STDOUT:\n")
+            f.write(result.stdout)
+            f.write("\nSTDERR:\n")
+            f.write(result.stderr)
+            f.write("-" * 50 + "\n")
+
         if result.returncode == 0:
             return True, ""
         else:
             error = result.stderr or result.stdout
+            logger.error(f"Manim rendering failed (exit code {result.returncode}). Check {log_file} for details.")
+            logger.error(f"Error preview: {error[:500]}")
             return False, error
 
     except subprocess.TimeoutExpired:
