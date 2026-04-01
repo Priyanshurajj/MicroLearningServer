@@ -293,19 +293,36 @@ def _create_segment_clip(
 def _create_manim_with_background(
     video_path: str, bg_path: str, duration: float
 ):
-    """Composites a Manim animation over a blurred, darkened background image."""
-    # Blur and darken the background image once at load time (not per-frame)
+    """Composites a transparent Manim animation natively over an unblurred background image."""
     pil_bg = Image.open(bg_path).convert("RGB")
     pil_bg = pil_bg.resize((REEL_WIDTH, REEL_HEIGHT), Image.LANCZOS)
-    pil_bg = pil_bg.filter(ImageFilter.GaussianBlur(radius=20))
-    bg_array = (np.array(pil_bg) * 0.4).astype(np.uint8)  # Darken to ~40% brightness
+    # No blurring or massive darkening — keep it cinematic. We dim slightly (85%) for contrast.
+    bg_array = (np.array(pil_bg) * 0.85).astype(np.uint8)
 
     bg_clip = ImageClip(bg_array).with_duration(duration)
 
-    manim_clip = VideoFileClip(video_path)
-    # Scale Manim to 90% so a thin strip of background is visible at edges
-    scale = min(REEL_WIDTH / manim_clip.w, REEL_HEIGHT / manim_clip.h) * 0.90
-    manim_clip = manim_clip.resized(scale)
+    manim_clip = VideoFileClip(video_path, has_mask=True)
+    
+    # Scale Manim to fit if the aspect ratios don't match, keeping it large
+    if manim_clip.w != REEL_WIDTH:
+        scale = min(REEL_WIDTH / manim_clip.w, REEL_HEIGHT / manim_clip.h)
+        manim_clip = manim_clip.resized(scale)
+
+    # If the Manim animation finishes before the audio, freeze it on the last frame
+    if manim_clip.duration < duration:
+        try:
+            t_last = max(0, manim_clip.duration - 0.1)
+            last_frame = manim_clip.get_frame(t_last)
+            freeze_dur = duration - manim_clip.duration
+            freeze_clip = ImageClip(last_frame).with_duration(freeze_dur)
+
+            if getattr(manim_clip, "mask", None) is not None:
+                last_mask = manim_clip.mask.get_frame(t_last)
+                freeze_clip = freeze_clip.with_mask(ImageClip(last_mask, is_mask=True))
+
+            manim_clip = concatenate_videoclips([manim_clip, freeze_clip], method="compose")
+        except Exception as e:
+            logger.warning(f"Could not extend transparent Manim clip duration: {e}")
 
     return CompositeVideoClip(
         [bg_clip, manim_clip.with_position("center")],

@@ -103,7 +103,7 @@ def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dic
     scene_name = asset.get("scene_name", "")
     seg_id = asset.get("segment_id")
     manim_dir = os.path.join(OUTPUT_DIR, run_id, "manim")
-    output_video = os.path.join(manim_dir, f"segment_{seg_id}.mp4")
+    output_video = os.path.join(manim_dir, f"segment_{seg_id}.mov")
 
     if not code_path or not os.path.exists(code_path):
         return {
@@ -243,7 +243,8 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
                 "python", "-m", "manim", "render",
                 "-ql",
                 "--progress_bar", "display",
-                "--format", "mp4",
+                "-t",
+                "--format", "mov",
                 "--media_dir", output_dir,
                 code_path,
                 scene_name,
@@ -286,7 +287,7 @@ def _find_rendered_video(manim_dir: str, scene_name: str) -> str | None:
     """Searches for the rendered video file in Manim's output structure."""
     for root, _, files in os.walk(manim_dir):
         for f in files:
-            if f.endswith(".mp4") and scene_name in f:
+            if (f.endswith(".mp4") or f.endswith(".mov") or f.endswith(".webm")) and scene_name in f:
                 return os.path.join(root, f)
     return None
 
