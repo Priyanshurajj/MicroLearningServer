@@ -19,7 +19,7 @@ def generate_images(tool_context: ToolContext) -> dict:
 
     Handles two cases:
     - general segments → regular image (is_background: false)
-    - maths segments with background_image: true → blurred bg image (is_background: true)
+    - manim segments with background_image: true → blurred bg image (is_background: true)
     """
     script_json = tool_context.state.get("enhanced_script", "")
     if not script_json:
@@ -45,7 +45,7 @@ def generate_images(tool_context: ToolContext) -> dict:
             tasks.append((seg, False))
         elif seg.get("background_image", False):
             tasks.append((seg, True))
-        # maths without background_image → skip
+        # manim without background_image → skip
 
     if not tasks:
         result = {"run_id": run_id, "images": [], "total_images": 0}
@@ -161,7 +161,7 @@ image_agent = Agent(
     model=ROUTING_MODEL,
     description=(
         "Generates all Imagen images: photorealistic images for general segments "
-        "and optional blurred background images for maths segments."
+        "and optional blurred background images for manim segments."
     ),
     instruction=(
         "You are the Image Agent. "

@@ -18,13 +18,13 @@ RULES:
 1. Break the content into 3-6 short segments (5-10 seconds each).
 2. For EACH segment, determine its type:
    - "general": Normal educational content (explanations, introductions, real-world examples, summaries)
-   - "maths": Mathematical or scientific content that requires equations, formulas, graphs, geometric shapes, or animated derivations
-3. A single video CAN have BOTH general and maths segments mixed together.
+   - "manim": CRITICAL! You MUST use this type for ANY scientific content including Physics, Chemistry, Math, or Algorithms that requires chemical equations, physics formulas, graphs, geometric shapes, molecular structures, or animated derivations. If the topic involves scientific formulas or reactions of any kind, use "manim".
+3. A single video CAN have BOTH general and manim segments mixed together.
 4. Each segment must have a clear narration text and a detailed visual description.
-5. For maths segments, include ALL relevant equations in math_expressions (array of LaTeX strings).
+5. For manim segments, include ALL relevant equations (including chemical formulas like H_2O -> ...) in math_expressions (array of LaTeX strings).
    A single slide can show multiple equations in sequence (e.g. derivation steps, related formulas).
    Also set math_expression to the first/primary equation for backward compatibility.
-6. Narration should be conversational, engaging, and suitable for a young audience.
+6. Narration must be a compelling narrative that grabs attention, preserves factual content, uses energetic language suitable for a young audience, and flows naturally. DO NOT just list dry facts.
 7. Visual descriptions should be specific enough for an AI image/animation generator.
 
 TOPIC/TRANSCRIPT:
@@ -46,7 +46,7 @@ OUTPUT FORMAT (strict JSON):
         }},
         {{
             "segment_id": 2,
-            "segment_type": "maths",
+            "segment_type": "manim",
             "narration": "Now let's look at the formula and how it's derived...",
             "visual_description": "Animated equations showing step-by-step derivation...",
             "duration_seconds": 10.0,
@@ -61,16 +61,10 @@ OUTPUT FORMAT (strict JSON):
 
 def generate_script(transcript: str, tool_context: ToolContext) -> dict:
     """Generates a structured educational video script from a transcript using Gemini.
-
-    Prefers narrative_transcript from state (set by storytelling_agent) over the raw
-    transcript parameter. Prepends hook_segment (set by hook_agent) if available.
+    Prepends hook_segment (set by hook_agent) if available.
     """
     try:
-        # Prefer narrative-wrapped transcript if storytelling_agent ran first
-        narrative = tool_context.state.get("narrative_transcript", "").strip()
-        effective_transcript = narrative if narrative else transcript
-
-        prompt = SCRIPT_GENERATION_PROMPT.format(transcript=effective_transcript)
+        prompt = SCRIPT_GENERATION_PROMPT.format(transcript=transcript)
 
         response = get_client().models.generate_content(
             model=TEXT_MODEL,

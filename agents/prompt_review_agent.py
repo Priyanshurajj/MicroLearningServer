@@ -21,7 +21,7 @@ CHECKS FOR general SEGMENTS:
 3. image_prompt clearly specifies photorealistic/cinematic style
    (if it mentions cartoon/flat/illustration, rewrite to photorealistic)
 
-CHECKS FOR maths SEGMENTS:
+CHECKS FOR manim SEGMENTS:
 1. manim_spec exists and has: scene_description, animations (non-empty array),
    color_scheme (non-empty array), math_elements (non-empty array)
 2. background_image field exists (true or false)

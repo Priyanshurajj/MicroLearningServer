@@ -44,7 +44,7 @@ Return ONLY the Python code. No explanations, no markdown code blocks.
 
 
 def generate_manim_code(tool_context: ToolContext) -> dict:
-    """Reads enhanced_script from state and generates Manim code for all maths segments."""
+    """Reads enhanced_script from state and generates Manim code for all manim segments."""
     script_json = tool_context.state.get("enhanced_script", "")
     if not script_json:
         script_json = tool_context.state.get("script_output", "")
@@ -59,22 +59,22 @@ def generate_manim_code(tool_context: ToolContext) -> dict:
     manim_dir = os.path.join(OUTPUT_DIR, run_id, "manim")
     os.makedirs(manim_dir, exist_ok=True)
 
-    maths_segments = [
+    manim_segments = [
         seg for seg in script.get("segments", [])
-        if seg.get("segment_type") == "maths"
+        if seg.get("segment_type") == "manim"
     ]
 
-    if not maths_segments:
+    if not manim_segments:
         result = {"run_id": run_id, "manim_assets": [], "total_manim": 0}
         tool_context.state["manim_code_output"] = json.dumps(result)
         return {"status": "success", "manim_code_output": json.dumps(result)}
 
     manim_assets = []
 
-    with ThreadPoolExecutor(max_workers=min(len(maths_segments), 4)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(manim_segments), 4)) as executor:
         futures = {
             executor.submit(_generate_single_manim_code, seg, manim_dir): seg
-            for seg in maths_segments
+            for seg in manim_segments
         }
         for future in as_completed(futures):
             manim_assets.append(future.result())
@@ -100,7 +100,7 @@ def generate_manim_code(tool_context: ToolContext) -> dict:
 
 
 def _generate_single_manim_code(seg: dict, manim_dir: str) -> dict:
-    """Generates Manim Python code for one maths segment."""
+    """Generates Manim Python code for one manim segment."""
     seg_id = seg["segment_id"]
     code_path = os.path.join(manim_dir, f"segment_{seg_id}.py")
 
@@ -176,7 +176,7 @@ manim_code_agent = Agent(
     name="manim_code_agent",
     model=ROUTING_MODEL,
     description=(
-        "Generates Manim Python animation code for all maths segments using Gemini 2.5 Pro. "
+        "Generates Manim Python animation code for all manim segments using Gemini 2.5 Pro. "
         "Supports multiple equations per segment via math_expressions[]."
     ),
     instruction=(

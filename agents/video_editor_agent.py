@@ -193,7 +193,7 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             "timeline": timeline,
             "total_clips": len(timeline),
             "general_clips": sum(1 for t in timeline if t["segment_type"] == "general"),
-            "maths_clips": sum(1 for t in timeline if t["segment_type"] == "maths"),
+            "manim_clips": sum(1 for t in timeline if t["segment_type"] == "manim"),
         }
 
         video_output_json = json.dumps(video_result)

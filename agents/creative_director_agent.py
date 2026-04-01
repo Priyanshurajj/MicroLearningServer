@@ -23,7 +23,7 @@ FOR "general" SEGMENTS:
 - Add an "image_prompt" field with the full Imagen-ready prompt.
 - Target aspect ratio: 9:16 (vertical reel)
 
-FOR "maths" SEGMENTS:
+FOR "manim" SEGMENTS:
 - Design a detailed Manim animation specification
 - Add a "manim_spec" field with:
   - "scene_description": what the viewer should see
@@ -78,12 +78,12 @@ def enhance_visual_prompts(tool_context: ToolContext) -> dict:
             1 for s in enhanced_script.get("segments", [])
             if s.get("segment_type") == "general"
         )
-        maths_count = sum(
+        manim_count = sum(
             1 for s in enhanced_script.get("segments", [])
-            if s.get("segment_type") == "maths"
+            if s.get("segment_type") == "manim"
         )
         logger.info(
-            f"Creative enhancement complete: {general_count} general, {maths_count} maths segments"
+            f"Creative enhancement complete: {general_count} general, {manim_count} manim segments"
         )
 
         enhanced_script_json = json.dumps(enhanced_script)

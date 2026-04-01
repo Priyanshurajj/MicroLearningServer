@@ -16,7 +16,7 @@ Review the following structured video script JSON and fix any issues found.
 CHECKS TO PERFORM:
 1. Every segment has a non-empty narration string
 2. Every segment has a non-empty visual_description string
-3. Every maths segment has math_expressions as a non-empty array (not null, not [])
+3. Every manim segment has math_expressions as a non-empty array (not null, not [])
 4. No duplicate segment_id values
 5. Segment IDs are integers; segments are orderable
 6. math_expressions values are valid LaTeX strings (not plain text)

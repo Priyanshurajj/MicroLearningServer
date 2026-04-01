@@ -66,7 +66,7 @@ def generate_visual_assets(tool_context: ToolContext) -> dict:
         seg_id = seg["segment_id"]
         seg_type = seg.get("segment_type", "general")
 
-        if seg_type == "maths":
+        if seg_type == "manim":
             asset = _generate_manim_code(seg, manim_dir)
         else:
             asset = _generate_image(seg, images_dir)
@@ -77,13 +77,13 @@ def generate_visual_assets(tool_context: ToolContext) -> dict:
         "run_id": run_id,
         "visual_assets": visual_assets,
         "total_assets": len(visual_assets),
-        "maths_clips": sum(1 for a in visual_assets if a["asset_type"] == "manim_code"),
+        "manim_clips": sum(1 for a in visual_assets if a["asset_type"] == "manim_code"),
         "general_images": sum(1 for a in visual_assets if a["asset_type"] == "image"),
     }
 
     logger.info(
         f"Visual assets: {result['general_images']} images, "
-        f"{result['maths_clips']} Manim scripts generated"
+        f"{result['manim_clips']} Manim scripts generated"
     )
 
     visual_output_json = json.dumps(result)
@@ -213,7 +213,7 @@ visual_asset_agent = Agent(
     model=ROUTING_MODEL,
     description=(
         "Generates visual assets: Imagen images for general segments "
-        "and Gemini 2.5 Pro Manim Python code for maths segments."
+        "and Gemini 2.5 Pro Manim Python code for manim segments."
     ),
     instruction=(
         "You are the Visual Asset Agent. "
