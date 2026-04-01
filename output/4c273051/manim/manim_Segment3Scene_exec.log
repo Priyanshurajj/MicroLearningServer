@@ -1,0 +1,148 @@
+--- Manim Render Output for Segment3Scene ---
+STDOUT:
+Manim Community v0.20.1
+
+[04/01/26 23:50:27] INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}Chloroplas                        
+                             ts\special{dvisvgm:raw                            
+                             </g>} to                                          
+                             output\4c273051\manim\Tex\                        
+                             9e2dcd823cefe12d.tex                              
+[04/01/26 23:50:32] INFO     Animation 0 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1584795214_1133253615_9                         
+                             32029457.mp4'                                     
+[04/01/26 23:50:33] INFO     Animation 1 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_2834709167_1                         
+                             244898133.mp4'                                    
+[04/01/26 23:50:34] INFO     Animation 2 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3581186446_2                         
+                             844410161.mp4'                                    
+[04/01/26 23:50:35] INFO     Animation 3 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3394500337_4                         
+                             047856644.mp4'                                    
+                    INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}6CO_2\spec                        
+                             ial{dvisvgm:raw </g>} to                          
+                             output\4c273051\manim\Tex\                        
+                             3b970295ea0071a7.tex                              
+[04/01/26 23:50:37] INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}+\special{                        
+                             dvisvgm:raw </g>} to                              
+                             output\4c273051\manim\Tex\                        
+                             713151ed93a8b1f5.tex                              
+[04/01/26 23:50:39] INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}6H_2O\spec                        
+                             ial{dvisvgm:raw </g>} to                          
+                             output\4c273051\manim\Tex\                        
+                             51ee3a0e3ef614fb.tex                              
+[04/01/26 23:50:42] INFO     Animation 4 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3459089006_1                         
+                             343903375.mp4'                                    
+[04/01/26 23:50:43] INFO     Animation 5 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3394500337_2                         
+                             071029638.mp4'                                    
+[04/01/26 23:50:44] INFO     Animation 6 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_4071718976_2                         
+                             811165273.mp4'                                    
+[04/01/26 23:50:45] INFO     Animation 7 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3394500337_3                         
+                             072835018.mp4'                                    
+[04/01/26 23:50:46] INFO     Animation 8 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_3883506809_9                         
+                             98098716.mp4'                                     
+[04/01/26 23:50:47] INFO     Animation 9 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\4072820271_4217992463_2                         
+                             940064235.mp4'                                    
+                    INFO     Combining to Movie file.  scene_file_writer.py:753
+                    INFO                               scene_file_writer.py:904
+                             File ready at                                     
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\4c273051\manim\out                         
+                             put\4c273051\manim\videos                         
+                             \segment_3\480p15\Segment                         
+                             3Scene.mp4'                                       
+                                                                               
+                    INFO     Rendered Segment3Scene                scene.py:278
+                             Played 10 animations                              
+
+STDERR:
+
+Animation 0: FadeIn(Tex('Chloroplasts')):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                                
+
+Animation 2: FadeOut(Tex('Chloroplasts')):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                                 
+
+Animation 4: Write(MathTex('6CO_2')):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                            
+
+Animation 6: Write(MathTex('+')):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                        
+
+Animation 8: Write(MathTex('6H_2O')):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                            
+--------------------------------------------------

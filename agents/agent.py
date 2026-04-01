@@ -1,6 +1,5 @@
 from google.adk.agents import SequentialAgent, ParallelAgent
 
-from .hook_agent import hook_agent
 from .script_generation_agent import script_agent
 from .script_review_agent import script_review_agent
 from .creative_director_agent import creative_director_agent
@@ -29,8 +28,7 @@ root_agent = SequentialAgent(
     name="root_agent",
     description="Complete EduReel content creation pipeline.",
     sub_agents=[
-        hook_agent,               # 2. Generate curiosity hook opening segment
-        script_agent,             # 3. Generate structured script (uses narrative_transcript + hook_segment)
+        script_agent,             # 1. Generate structured script (including dramatic hook)
         script_review_agent,      # 4. Validate & repair script JSON
         creative_director_agent,  # 5. Enhance visual prompts (cinematic + manim_spec)
         prompt_review_agent,      # 6. Safety-check image prompts & manim_spec

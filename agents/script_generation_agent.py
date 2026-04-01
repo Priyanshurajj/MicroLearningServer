@@ -16,6 +16,9 @@ Given the following topic or transcript, create a structured video script.
 
 RULES:
 1. Break the content into 3-6 short segments (5-10 seconds each).
+   - The VERY FIRST segment (segment_id: 1) MUST be a dramatic opening hook.
+   - The hook must pose a surprising or mind-bending question to create immediate curiosity ("Did you know...", "What if...", "Why does...").
+   - The hook narration must be completable in 6 seconds (max 2 short sentences). Do NOT explain the topic yet.
 2. For EACH segment, determine its type:
    - "general": Normal educational content (explanations, introductions, real-world examples, summaries)
    - "manim": CRITICAL! You MUST use this type for ANY scientific content including Physics, Chemistry, Math, or Algorithms that requires chemical equations, physics formulas, graphs, geometric shapes, molecular structures, or animated derivations. If the topic involves scientific formulas or reactions of any kind, use "manim".
@@ -60,9 +63,7 @@ OUTPUT FORMAT (strict JSON):
 
 
 def generate_script(transcript: str, tool_context: ToolContext) -> dict:
-    """Generates a structured educational video script from a transcript using Gemini.
-    Prepends hook_segment (set by hook_agent) if available.
-    """
+    """Generates a structured educational video script from a transcript using Gemini."""
     try:
         prompt = SCRIPT_GENERATION_PROMPT.format(transcript=transcript)
 
@@ -87,23 +88,9 @@ def generate_script(transcript: str, tool_context: ToolContext) -> dict:
         for subdir in ["audio", "images", "manim", "concept_map"]:
             os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)
 
-        # Prepend hook segment if hook_agent generated one
-        hook_json = tool_context.state.get("hook_segment", "")
-        if hook_json:
-            try:
-                hook_segment = json.loads(hook_json)
-                # Re-inject run_id so downstream agents can find output dirs
-                hook_segment["run_id_ref"] = run_id
-                existing_ids = {s["segment_id"] for s in script_data.get("segments", [])}
-                hook_segment["segment_id"] = 0 if 0 not in existing_ids else -1
-                script_data["segments"] = [hook_segment] + script_data.get("segments", [])
-                logger.info("Hook segment prepended to script")
-            except (json.JSONDecodeError, KeyError) as e:
-                logger.warning(f"Could not prepend hook segment: {e}")
-
         logger.info(
-            f"Script generated: {len(script_data.get('segments', []))} segments "
-            f"(incl. hook), run_id={run_id}"
+            f"Script generated: {len(script_data.get('segments', []))} segments, "
+            f"run_id={run_id}"
         )
 
         script_json_str = json.dumps(script_data)
