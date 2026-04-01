@@ -17,13 +17,13 @@ PADDING = 12
 NODE_H = 36
 NODE_RADIUS = 6
 
-ACTIVE_COLOR = (255, 220, 0, 230)      # Yellow for active topic
+ACTIVE_COLOR = (255, 220, 0, 240)      # Vibrant yellow for active topic
 INACTIVE_COLOR = (160, 160, 160, 180)  # Gray for inactive topics
-BG_COLOR = (0, 0, 0, 170)             # Dark semi-transparent background
+BG_COLOR = (0, 0, 0, 90)              # Modern highly-transparent dark background
 ACTIVE_TEXT = (20, 20, 20, 255)        # Dark text on yellow
-INACTIVE_TEXT = (210, 210, 210, 255)   # Light text on dark
-CONNECTOR_COLOR = (100, 100, 100, 180) # Connector lines between nodes
-BORDER_COLOR = (80, 80, 80, 200)       # Border around map
+INACTIVE_TEXT = (240, 240, 240, 255)   # Bright text on dark
+CONNECTOR_COLOR = (255, 255, 255, 70)  # Subtle white connector lines
+BORDER_COLOR = (255, 255, 255, 40)     # Clean transparent white border (glass effect)
 
 
 def generate_concept_map_frames(tool_context: ToolContext) -> dict:
@@ -150,8 +150,8 @@ def _render_concept_map(
         else:
             draw.rounded_rectangle(
                 node_rect, radius=NODE_RADIUS,
-                fill=(30, 30, 30, 140),
-                outline=(70, 70, 70, 160),
+                fill=(255, 255, 255, 15),
+                outline=(255, 255, 255, 30),
                 width=1,
             )
             display = _truncate_label(label, draw, font_inactive, MAP_W - PADDING * 2 - 10)

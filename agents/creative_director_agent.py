@@ -36,12 +36,13 @@ FOR "manim" SEGMENTS:
 - When background_image is true, also add an "image_prompt" describing a dramatic, blurred
   real-world scene relevant to the concept (it will be shown defocused behind the animation).
 
-FOR ALL SEGMENTS — OPTIONAL text overlay:
-- Add a "text_overlay" field ONLY IF the segment introduces a named concept, formula title, or
-  key term that a viewer would benefit from seeing written on screen.
-- Leave "text_overlay" COMPLETELY ABSENT for narrative, transitional, or hook segments.
-- When added: 1-2 lines maximum, only 1-3 highlight_words (the single most important term).
-  Format: {{"lines": ["Term Name"], "highlight_words": ["Term"]}}
+FOR ALL SEGMENTS — Text Overlay:
+- You MUST add a "text_overlay" field for MOST segments (at least 70% of the video).
+- Text overlays can be added to BOTH "general" image segments and "manim" background segments.
+- Add it whenever a named concept, formula, or key term is introduced.
+- Leave "text_overlay" absent ONLY for the opening hook (segment_id: 1) or purely transitional segments.
+- Keep it to 1-2 lines maximum. Identify 1-3 highlight_words (the most important terms) exactly matching the lines.
+- Format: {{"lines": ["Short Concept Name"], "highlight_words": ["Concept"]}}
 
 INPUT SCRIPT:
 {script_json}
