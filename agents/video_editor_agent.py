@@ -2,8 +2,9 @@ import json
 import os
 import logging
 import subprocess
-import tempfile
 
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from google.adk.agents import Agent
 from google.adk.tools import ToolContext
 from moviepy import (
@@ -12,10 +13,11 @@ from moviepy import (
     AudioFileClip,
     concatenate_videoclips,
     ColorClip,
+    CompositeVideoClip,
 )
 import imageio_ffmpeg
 
-from .config import ROUTING_MODEL, OUTPUT_DIR
+from .config import ROUTING_MODEL, OUTPUT_DIR, OVERLAY_FONT_PATH
 
 logger = logging.getLogger("EduReelADK")
 
@@ -23,15 +25,31 @@ REEL_WIDTH = 1080
 REEL_HEIGHT = 1920
 FPS = 30
 
+# Text overlay constants
+OVERLAY_FONT_SIZE = 52
+HIGHLIGHT_RGBA = (255, 220, 0, 230)
+TEXT_RGBA = (255, 255, 255, 255)
+SHADOW_RGBA = (0, 0, 0, 160)
+OVERLAY_Y_RATIO = 0.72   # Text block starts at 72% down the frame
+
+# Concept map overlay position (top-right, 20px margin)
+CONCEPT_MAP_W = 240
+CONCEPT_MAP_MARGIN = 20
+
 
 def compose_final_video(tool_context: ToolContext) -> dict:
-    """Reads enhanced_script, tts_output, qc_output from session state."""
+    """Reads enhanced_script, tts_output, qc_output, image_output, concept_map_output
+    from session state and composes the final reel MP4."""
     try:
         script = json.loads(tool_context.state.get("enhanced_script", "{}"))
         tts_data = json.loads(tool_context.state.get("tts_output", "{}"))
         qc_data = json.loads(tool_context.state.get("qc_output", "{}"))
+        image_data = json.loads(tool_context.state.get("image_output", "{}"))
+        concept_map_data = json.loads(
+            tool_context.state.get("concept_map_output", "{}")
+        )
     except (json.JSONDecodeError, TypeError) as e:
-        return {"status": "error", "error": f"Invalid JSON provided to Video Editor: {e}"}
+        return {"status": "error", "error": f"Invalid JSON in state: {e}"}
 
     run_id = script.get("run_id", qc_data.get("run_id", "default"))
     output_path = os.path.join(OUTPUT_DIR, run_id, "final_reel.mp4")
@@ -39,18 +57,31 @@ def compose_final_video(tool_context: ToolContext) -> dict:
 
     segments = sorted(script.get("segments", []), key=lambda s: s["segment_id"])
 
-    # Normalize paths that may have been double-escaped through JSON layers
-    audio_map = {}
+    # ── Build lookup maps ──
+
+    # Audio: segment_id → audio metadata
+    audio_map: dict[int, dict] = {}
     for s in tts_data.get("audio_segments", []):
         s["audio_file_path"] = os.path.normpath(s.get("audio_file_path", ""))
         audio_map[s["segment_id"]] = s
 
-    asset_map = {}
+    # Manim videos: segment_id → qc asset (has video_path + optional background_image_path)
+    manim_map: dict[int, dict] = {}
     for a in qc_data.get("qc_assets", []):
-        for key in ("image_file_path", "video_path"):
-            if key in a:
-                a[key] = os.path.normpath(a[key])
-        asset_map[a["segment_id"]] = a
+        if "video_path" in a:
+            a["video_path"] = os.path.normpath(a["video_path"])
+        manim_map[a["segment_id"]] = a
+
+    # Regular images: segment_id → image asset (is_background=false)
+    image_map: dict[int, dict] = {}
+    for img in image_data.get("images", []):
+        if not img.get("is_background", False):
+            if img.get("image_file_path"):
+                img["image_file_path"] = os.path.normpath(img["image_file_path"])
+            image_map[img["segment_id"]] = img
+
+    # Concept map frames: segment_id (str) → PNG path
+    concept_frames: dict[str, str] = concept_map_data.get("frames", {})
 
     clips = []
     timeline = []
@@ -59,19 +90,29 @@ def compose_final_video(tool_context: ToolContext) -> dict:
     for seg in segments:
         seg_id = seg["segment_id"]
         audio_info = audio_map.get(seg_id, {})
-        asset_info = asset_map.get(seg_id, {})
+        manim_asset = manim_map.get(seg_id)
+        image_asset = image_map.get(seg_id)
 
         audio_path = audio_info.get("audio_file_path", "")
-        audio_duration = audio_info.get("duration_seconds", seg.get("duration_seconds", 5.0))
+        audio_duration = audio_info.get(
+            "duration_seconds", seg.get("duration_seconds", 5.0)
+        )
+        concept_frame_path = concept_frames.get(str(seg_id), "")
 
         try:
-            clip = _create_segment_clip(seg, asset_info, audio_path, audio_duration)
+            clip = _create_segment_clip(
+                seg, manim_asset, image_asset,
+                audio_path, audio_duration, concept_frame_path,
+            )
             if clip is not None:
                 clips.append(clip)
                 timeline.append({
                     "segment_id": seg_id,
                     "segment_type": seg.get("segment_type", "general"),
-                    "visual_type": asset_info.get("asset_type", "unknown"),
+                    "visual_type": (
+                        "manim" if manim_asset else
+                        "image" if image_asset else "fallback"
+                    ),
                     "start_time": round(current_time, 2),
                     "end_time": round(current_time + audio_duration, 2),
                     "duration_seconds": round(audio_duration, 2),
@@ -79,7 +120,7 @@ def compose_final_video(tool_context: ToolContext) -> dict:
                 current_time += audio_duration
         except Exception as e:
             logger.error(f"Failed to create clip for segment {seg_id}: {e}")
-            fallback = _create_fallback_clip(audio_path, audio_duration)
+            fallback = _create_fallback_clip(audio_duration)
             if fallback:
                 clips.append(fallback)
                 current_time += audio_duration
@@ -87,24 +128,19 @@ def compose_final_video(tool_context: ToolContext) -> dict:
     if not clips:
         return {"status": "error", "error": "No clips were created."}
 
-    # ── Write video using subprocess FFmpeg (avoids pipe deadlock) ──
     try:
         final_video = concatenate_videoclips(clips, method="compose")
 
-        # Step 1: Write a temporary raw video (no audio) using imageio
-        # This avoids the FFmpeg pipe deadlock that write_videofile causes
         temp_video = os.path.join(os.path.dirname(output_path), "temp_video.mp4")
         temp_audio = os.path.join(os.path.dirname(output_path), "temp_audio.mp3")
 
-        # Write video without audio first — uses imageio internally, no pipe issues
         final_video.without_audio().write_videofile(
             temp_video,
             fps=FPS,
             codec="libx264",
-            logger="bar",  # MUST keep "bar" — None causes FFmpeg pipe deadlock
+            logger="bar",
         )
 
-        # Write concatenated audio separately
         if final_video.audio is not None:
             final_video.audio.write_audiofile(temp_audio, logger="bar")
 
@@ -112,9 +148,8 @@ def compose_final_video(tool_context: ToolContext) -> dict:
         for clip in clips:
             clip.close()
 
-        # Step 2: Merge video + audio with FFmpeg subprocess (non-blocking, clean pipes)
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        
+
         if os.path.exists(temp_audio):
             ffmpeg_cmd = [
                 ffmpeg_exe, "-y",
@@ -134,13 +169,9 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             ]
 
         result = subprocess.run(
-            ffmpeg_cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
+            ffmpeg_cmd, capture_output=True, text=True, timeout=300
         )
 
-        # Cleanup temp files
         for f in [temp_video, temp_audio]:
             if os.path.exists(f):
                 os.remove(f)
@@ -172,60 +203,183 @@ def compose_final_video(tool_context: ToolContext) -> dict:
         return {"status": "error", "error": str(e)}
 
 
-def _create_segment_clip(seg, asset_info, audio_path, duration):
-    asset_type = asset_info.get("asset_type", "")
+def _create_segment_clip(
+    seg: dict,
+    manim_asset: dict | None,
+    image_asset: dict | None,
+    audio_path: str,
+    duration: float,
+    concept_frame_path: str,
+):
+    """Builds a single segment clip with optional background, text overlay, and concept map."""
 
-    if asset_type == "manim_video" and asset_info.get("status") == "rendered":
-        video_path = asset_info.get("video_path", "")
+    # ── 1. Base clip ──
+    if manim_asset and manim_asset.get("status") == "rendered":
+        video_path = manim_asset.get("video_path", "")
+        bg_path = manim_asset.get("background_image_path", "")
+
         if video_path and os.path.exists(video_path):
-            clip = VideoFileClip(video_path)
-            clip = clip.resized(height=REEL_HEIGHT)
-            if clip.w != REEL_WIDTH:
-                clip = clip.resized(width=REEL_WIDTH)
+            if bg_path and os.path.exists(bg_path):
+                clip = _create_manim_with_background(video_path, bg_path, duration)
+            else:
+                manim_clip = VideoFileClip(video_path)
+                manim_clip = manim_clip.resized(height=REEL_HEIGHT)
+                if manim_clip.w != REEL_WIDTH:
+                    manim_clip = manim_clip.resized(width=REEL_WIDTH)
+                clip = manim_clip
         else:
-            clip = _create_fallback_clip(audio_path, duration)
+            clip = _create_fallback_clip(duration)
 
-    elif asset_type == "image" and asset_info.get("status") == "generated":
-        image_path = asset_info.get("image_file_path", "")
+    elif image_asset and image_asset.get("status") == "generated":
+        image_path = image_asset.get("image_file_path", "")
         if image_path and os.path.exists(image_path):
             clip = ImageClip(image_path, duration=duration)
             clip = clip.resized(height=REEL_HEIGHT)
             if clip.w != REEL_WIDTH:
                 clip = clip.resized(width=REEL_WIDTH)
-
-            # Ken Burns effect: slow zoom in
-            clip = clip.resized(lambda t: 1 + 0.03 * t)
             clip = clip.with_duration(duration)
         else:
-            clip = _create_fallback_clip(audio_path, duration)
+            clip = _create_fallback_clip(duration)
     else:
-        clip = _create_fallback_clip(audio_path, duration)
+        clip = _create_fallback_clip(duration)
 
-    # Attach audio
+    # ── 2. Text overlay (PIL-rendered, only if segment specifies it) ──
+    text_overlay = seg.get("text_overlay")
+    if text_overlay and clip is not None:
+        try:
+            overlay_clip = _render_text_overlay_pil(
+                text_overlay, REEL_WIDTH, REEL_HEIGHT, clip.duration
+            )
+            clip = CompositeVideoClip(
+                [clip, overlay_clip],
+                size=(REEL_WIDTH, REEL_HEIGHT),
+            )
+        except Exception as e:
+            logger.warning(f"Text overlay failed for segment {seg.get('segment_id')}: {e}")
+
+    # ── 3. Concept map overlay (top-right corner) ──
+    if concept_frame_path and os.path.exists(concept_frame_path) and clip is not None:
+        try:
+            map_clip = ImageClip(concept_frame_path).with_duration(clip.duration)
+            x_pos = REEL_WIDTH - CONCEPT_MAP_W - CONCEPT_MAP_MARGIN
+            clip = CompositeVideoClip(
+                [clip, map_clip.with_position((x_pos, CONCEPT_MAP_MARGIN))],
+                size=(REEL_WIDTH, REEL_HEIGHT),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Concept map overlay failed for segment {seg.get('segment_id')}: {e}"
+            )
+
+    # ── 4. Attach audio ──
     if clip and audio_path and os.path.exists(audio_path):
         audio = AudioFileClip(audio_path)
         if abs(clip.duration - audio.duration) > 0.5:
             clip = clip.with_duration(audio.duration)
         clip = clip.with_audio(audio)
 
+    # ── 5. Smooth fade transitions ──
+    if clip is not None:
+        fade = min(0.3, clip.duration / 4)
+        clip = clip.fadein(fade).fadeout(fade)
+
     return clip
 
 
-def _create_fallback_clip(audio_path, duration):
-    clip = ColorClip(
+def _create_manim_with_background(
+    video_path: str, bg_path: str, duration: float
+):
+    """Composites a Manim animation over a blurred, darkened background image."""
+    # Blur and darken the background image once at load time (not per-frame)
+    pil_bg = Image.open(bg_path).convert("RGB")
+    pil_bg = pil_bg.resize((REEL_WIDTH, REEL_HEIGHT), Image.LANCZOS)
+    pil_bg = pil_bg.filter(ImageFilter.GaussianBlur(radius=20))
+    bg_array = (np.array(pil_bg) * 0.4).astype(np.uint8)  # Darken to ~40% brightness
+
+    bg_clip = ImageClip(bg_array).with_duration(duration)
+
+    manim_clip = VideoFileClip(video_path)
+    # Scale Manim to 90% so a thin strip of background is visible at edges
+    scale = min(REEL_WIDTH / manim_clip.w, REEL_HEIGHT / manim_clip.h) * 0.90
+    manim_clip = manim_clip.resized(scale)
+
+    return CompositeVideoClip(
+        [bg_clip, manim_clip.with_position("center")],
+        size=(REEL_WIDTH, REEL_HEIGHT),
+    ).with_duration(duration)
+
+
+def _render_text_overlay_pil(
+    text_overlay: dict, width: int, height: int, duration: float
+) -> ImageClip:
+    """Renders a text overlay with optional yellow word highlighting using PIL."""
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype(OVERLAY_FONT_PATH, OVERLAY_FONT_SIZE)
+    except (OSError, IOError):
+        font = ImageFont.load_default()
+
+    lines = text_overlay.get("lines", [])
+    highlight_words = {w.lower().strip(".,!?") for w in text_overlay.get("highlight_words", [])}
+
+    y = int(height * OVERLAY_Y_RATIO)
+    h_pad = 10   # horizontal padding inside highlight rect
+    v_pad = 8    # vertical padding inside highlight rect
+
+    for line in lines:
+        words = line.split()
+
+        # Measure total line width for centering
+        word_widths = []
+        for word in words:
+            bbox = draw.textbbox((0, 0), word + " ", font=font)
+            word_widths.append(bbox[2] - bbox[0])
+
+        total_w = sum(word_widths)
+        x = (width - total_w) // 2
+
+        for word, word_w in zip(words, word_widths):
+            clean = word.lower().strip(".,!?")
+            bbox = draw.textbbox((x, y), word, font=font)
+            word_h = bbox[3] - bbox[1]
+
+            if clean in highlight_words:
+                rect = [
+                    x - h_pad, y - v_pad,
+                    x + word_w - h_pad // 2 + h_pad, y + word_h + v_pad,
+                ]
+                draw.rounded_rectangle(rect, radius=6, fill=HIGHLIGHT_RGBA)
+                draw.text((x, y), word, font=font, fill=(20, 20, 20, 255))
+            else:
+                draw.text((x + 2, y + 2), word, font=font, fill=SHADOW_RGBA)
+                draw.text((x, y), word, font=font, fill=TEXT_RGBA)
+
+            x += word_w
+
+        # Line spacing
+        sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
+        line_h = sample_bbox[3] - sample_bbox[1]
+        y += line_h + 16
+
+    return ImageClip(np.array(img)).with_duration(duration)
+
+
+def _create_fallback_clip(duration: float):
+    return ColorClip(
         size=(REEL_WIDTH, REEL_HEIGHT),
         color=(20, 20, 30),
         duration=duration,
     )
-    return clip
 
 
 video_editor_agent = Agent(
     name="video_editor_agent",
     model=ROUTING_MODEL,
     description=(
-        "Composes the final educational reel by stitching static images "
-        "and Manim video clips with synchronized TTS audio narration."
+        "Composes the final educational reel by stitching Manim clips and images "
+        "with TTS audio, text overlays, concept map overlays, and smooth transitions."
     ),
     instruction=(
         "You are the Video Editor Agent. "
@@ -234,4 +388,3 @@ video_editor_agent = Agent(
     ),
     tools=[compose_final_video],
 )
-

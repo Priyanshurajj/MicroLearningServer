@@ -21,7 +21,9 @@ RULES:
    - "maths": Mathematical or scientific content that requires equations, formulas, graphs, geometric shapes, or animated derivations
 3. A single video CAN have BOTH general and maths segments mixed together.
 4. Each segment must have a clear narration text and a detailed visual description.
-5. For maths segments, include the exact math_expression (in LaTeX format) to be animated.
+5. For maths segments, include ALL relevant equations in math_expressions (array of LaTeX strings).
+   A single slide can show multiple equations in sequence (e.g. derivation steps, related formulas).
+   Also set math_expression to the first/primary equation for backward compatibility.
 6. Narration should be conversational, engaging, and suitable for a young audience.
 7. Visual descriptions should be specific enough for an AI image/animation generator.
 
@@ -39,15 +41,17 @@ OUTPUT FORMAT (strict JSON):
             "narration": "Engaging narration text for this segment...",
             "visual_description": "Detailed description of what should appear visually...",
             "duration_seconds": 5.0,
-            "math_expression": null
+            "math_expression": null,
+            "math_expressions": []
         }},
         {{
             "segment_id": 2,
             "segment_type": "maths",
-            "narration": "Now let's look at the formula...",
-            "visual_description": "Animated equation showing step-by-step derivation...",
-            "duration_seconds": 8.0,
-            "math_expression": "a^2 + b^2 = c^2"
+            "narration": "Now let's look at the formula and how it's derived...",
+            "visual_description": "Animated equations showing step-by-step derivation...",
+            "duration_seconds": 10.0,
+            "math_expression": "a^2 + b^2 = c^2",
+            "math_expressions": ["a^2 + b^2 = c^2", "c = \\\\sqrt{{a^2 + b^2}}"]
         }}
     ],
     "total_duration_seconds": 25.0
@@ -56,9 +60,17 @@ OUTPUT FORMAT (strict JSON):
 
 
 def generate_script(transcript: str, tool_context: ToolContext) -> dict:
-    """Generates a structured educational video script from a transcript using Gemini."""
+    """Generates a structured educational video script from a transcript using Gemini.
+
+    Prefers narrative_transcript from state (set by storytelling_agent) over the raw
+    transcript parameter. Prepends hook_segment (set by hook_agent) if available.
+    """
     try:
-        prompt = SCRIPT_GENERATION_PROMPT.format(transcript=transcript)
+        # Prefer narrative-wrapped transcript if storytelling_agent ran first
+        narrative = tool_context.state.get("narrative_transcript", "").strip()
+        effective_transcript = narrative if narrative else transcript
+
+        prompt = SCRIPT_GENERATION_PROMPT.format(transcript=effective_transcript)
 
         response = get_client().models.generate_content(
             model=TEXT_MODEL,
@@ -78,12 +90,26 @@ def generate_script(transcript: str, tool_context: ToolContext) -> dict:
 
         # Create output directories for this run
         run_dir = os.path.join(OUTPUT_DIR, run_id)
-        for subdir in ["audio", "images", "manim"]:
+        for subdir in ["audio", "images", "manim", "concept_map"]:
             os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)
 
+        # Prepend hook segment if hook_agent generated one
+        hook_json = tool_context.state.get("hook_segment", "")
+        if hook_json:
+            try:
+                hook_segment = json.loads(hook_json)
+                # Re-inject run_id so downstream agents can find output dirs
+                hook_segment["run_id_ref"] = run_id
+                existing_ids = {s["segment_id"] for s in script_data.get("segments", [])}
+                hook_segment["segment_id"] = 0 if 0 not in existing_ids else -1
+                script_data["segments"] = [hook_segment] + script_data.get("segments", [])
+                logger.info("Hook segment prepended to script")
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning(f"Could not prepend hook segment: {e}")
+
         logger.info(
-            f"Script generated: {len(script_data.get('segments', []))} segments, "
-            f"run_id={run_id}"
+            f"Script generated: {len(script_data.get('segments', []))} segments "
+            f"(incl. hook), run_id={run_id}"
         )
 
         script_json_str = json.dumps(script_data)

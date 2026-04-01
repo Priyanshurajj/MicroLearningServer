@@ -31,36 +31,47 @@ Common issues to check:
 - self.play() requires animation objects, not mobjects directly
 - self.wait() for pauses
 - Axes must use proper ranges
+- Transform/ReplacementTransform requires two mobjects of the same type
 
 Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 """
 
 
 def execute_manim_qc(tool_context: ToolContext) -> dict:
-    """Reads visual_output from session state and executes Manim QC."""
-    visual_output_json = tool_context.state.get("visual_output", "")
+    """Reads manim_code_output and image_output from state, renders Manim, attaches bg images."""
+    manim_code_json = tool_context.state.get("manim_code_output", "")
+    image_output_json = tool_context.state.get("image_output", "{}")
     enhanced_script_json = tool_context.state.get("enhanced_script", "{}")
     if not enhanced_script_json:
         enhanced_script_json = tool_context.state.get("script_output", "{}")
 
     try:
-        visual_data = json.loads(visual_output_json)
+        manim_data = json.loads(manim_code_json) if manim_code_json else {"manim_assets": []}
+        image_data = json.loads(image_output_json)
         script_data = json.loads(enhanced_script_json)
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Manim QC: Cannot parse state: {e}")
         return {"status": "error", "error": f"Cannot parse state: {e}"}
 
-    run_id = visual_data.get("run_id", "default")
-    assets = visual_data.get("visual_assets", [])
+    run_id = manim_data.get("run_id") or image_data.get("run_id", "default")
+
+    # Build background image lookup: segment_id → image_file_path (is_background=true only)
+    bg_lookup: dict[int, str] = {
+        img["segment_id"]: img["image_file_path"]
+        for img in image_data.get("images", [])
+        if img.get("is_background") and img.get("image_file_path")
+    }
+
+    manim_assets = manim_data.get("manim_assets", [])
     qc_results = []
 
-    for asset in assets:
-        if asset.get("asset_type") == "manim_code":
-            result = _render_manim_with_retry(asset, run_id, script_data)
-            qc_results.append(result)
-        else:
-            # Pass through image assets unchanged
-            qc_results.append(asset)
+    for asset in manim_assets:
+        result = _render_manim_with_retry(asset, run_id, script_data)
+        # Attach background image path if available for this segment
+        seg_id = result.get("segment_id")
+        if seg_id in bg_lookup:
+            result["background_image_path"] = bg_lookup[seg_id]
+        qc_results.append(result)
 
     output = {
         "run_id": run_id,
@@ -73,13 +84,12 @@ def execute_manim_qc(tool_context: ToolContext) -> dict:
             1 for r in qc_results
             if r.get("asset_type") in ("manim_video", "manim_code") and r.get("status") == "failed"
         ),
-        "images_passed": sum(1 for r in qc_results if r.get("asset_type") == "image"),
-        "total_assets": len(qc_results),
+        "total_manim": len(qc_results),
     }
 
     logger.info(
         f"Manim QC complete: {output['manim_rendered']} rendered, "
-        f"{output['manim_failed']} failed, {output['images_passed']} images passed"
+        f"{output['manim_failed']} failed"
     )
 
     qc_output_json = json.dumps(output)
@@ -111,10 +121,8 @@ def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dic
         success, error_output = _run_manim_render(code_path, scene_name, manim_dir)
 
         if success:
-            # Find the rendered video file
             rendered_path = _find_rendered_video(manim_dir, scene_name)
             if rendered_path:
-                # Move to expected output path
                 if rendered_path != output_video:
                     os.replace(rendered_path, output_video)
 
@@ -137,19 +145,19 @@ def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dic
                 logger.error(f"Auto-fix failed for segment {seg_id}")
                 break
 
-    # If all 3 attempts fail, try fallback static text animation
+    # All attempts failed — try fallback static text animation
     logger.warning(
         f"Manim render failed all {MAX_FIX_ATTEMPTS} attempts for segment {seg_id}. "
         f"Generating fallback generic Manim script..."
     )
-    
+
     fallback_code = _generate_fallback_manim_code(asset, script_data)
     with open(code_path, "w", encoding="utf-8") as f:
         f.write(fallback_code)
-    
+
     logger.info(f"Rendering fallback script for segment {seg_id}...")
     success, error_output = _run_manim_render(code_path, scene_name, manim_dir)
-    
+
     if success:
         rendered_path = _find_rendered_video(manim_dir, scene_name)
         if rendered_path:
@@ -174,18 +182,17 @@ def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dic
         "render_attempts": MAX_FIX_ATTEMPTS + 1,
     }
 
+
 def _generate_fallback_manim_code(asset: dict, script_data: dict) -> str:
-    """Generates a reliable fallback Scene matching video_generator.py logic."""
+    """Generates a reliable fallback Scene using a simple text card layout."""
     seg_id = asset.get("segment_id")
     scene_name = asset.get("scene_name", f"Segment{seg_id}Scene")
-    
-    # Find the corresponding text in the script
+
     segments = script_data.get("segments", [])
     target_seg = next((s for s in segments if s.get("segment_id") == seg_id), {})
     narration = target_seg.get("narration", "Educational Content")
     title = script_data.get("title", f"Segment {seg_id}")
-    
-    # Escape quotes
+
     narration = narration.replace('"', '\\"').replace('\n', ' ')
     title = title.replace('"', '\\"').replace('\n', ' ')
 
@@ -194,7 +201,6 @@ import textwrap
 
 class {scene_name}(Scene):
     def construct(self):
-        # Fallback static text animation
         card = RoundedRectangle(
             corner_radius=0.4,
             width=12,
@@ -235,7 +241,7 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
         result = subprocess.run(
             [
                 "python", "-m", "manim", "render",
-                "-ql",  # Low quality for speed
+                "-ql",
                 "--progress_bar", "display",
                 "--format", "mp4",
                 "--media_dir", output_dir,
@@ -261,7 +267,10 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
             return True, ""
         else:
             error = result.stderr or result.stdout
-            logger.error(f"Manim rendering failed (exit code {result.returncode}). Check {log_file} for details.")
+            logger.error(
+                f"Manim rendering failed (exit code {result.returncode}). "
+                f"Check {log_file} for details."
+            )
             logger.error(f"Error preview: {error[:500]}")
             return False, error
 
@@ -275,8 +284,7 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
 
 def _find_rendered_video(manim_dir: str, scene_name: str) -> str | None:
     """Searches for the rendered video file in Manim's output structure."""
-    # Manim outputs to: media_dir/videos/{filename}/480p15/{scene_name}.mp4
-    for root, dirs, files in os.walk(manim_dir):
+    for root, _, files in os.walk(manim_dir):
         for f in files:
             if f.endswith(".mp4") and scene_name in f:
                 return os.path.join(root, f)
@@ -298,13 +306,12 @@ def _auto_fix_code(code_path: str, error_output: str) -> bool:
             model=CODE_MODEL,
             contents=prompt,
             config=genai.types.GenerateContentConfig(
-                temperature=0.1,  # Very low temperature for precise fixes
+                temperature=0.1,
             ),
         )
 
         fixed_code = response.text.strip()
 
-        # Strip markdown code fences if present
         if fixed_code.startswith("```python"):
             fixed_code = fixed_code[len("```python"):].strip()
         if fixed_code.startswith("```"):
@@ -312,7 +319,6 @@ def _auto_fix_code(code_path: str, error_output: str) -> bool:
         if fixed_code.endswith("```"):
             fixed_code = fixed_code[:-3].strip()
 
-        # Overwrite the code file with fixed version
         with open(code_path, "w", encoding="utf-8") as f:
             f.write(fixed_code)
 
@@ -330,7 +336,7 @@ manim_qc_agent = Agent(
     description=(
         "Executes Manim Python code in a subprocess, catches render errors, "
         "and uses Gemini 2.5 Pro to auto-heal broken code (up to 3 attempts). "
-        "Passes through image assets unchanged."
+        "Attaches background image paths to rendered Manim assets."
     ),
     instruction=(
         "You are the Manim QC Agent. "

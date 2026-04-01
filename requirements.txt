@@ -8,3 +8,5 @@ gTTS
 moviepy
 manim
 Pillow
+numpy
+google-cloud-texttospeech

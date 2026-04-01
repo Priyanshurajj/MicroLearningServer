@@ -8,25 +8,40 @@ from .config import get_client, TEXT_MODEL, ROUTING_MODEL
 
 logger = logging.getLogger("EduReelADK")
 
-CREATIVE_ENHANCEMENT_PROMPT = """You are a Creative Director for an educational video production studio.
+CREATIVE_ENHANCEMENT_PROMPT = """You are a Creative Director for an educational video production studio specializing in cinematic, high-quality short-form reels.
 
-You will receive a structured video script with segments. Your job is to enhance each segment's visual description into a production-grade prompt.
+You will receive a structured video script with segments. Your job is to enhance each segment's visual description into a production-grade specification.
 
 FOR "general" SEGMENTS:
 - Rewrite the visual_description into a detailed, cinematic image generation prompt
-- Include: art style (modern flat design / 3D render / photorealistic), color palette, composition, lighting, mood
-- Add an "image_prompt" field with the full Imagen-ready prompt
+- Art style: STRICTLY photorealistic and cinematic. No illustrations, no flat design, no cartoons, no vector art, no anime.
+- Shot style: Cinematic wide shot or extreme close-up. Shot on RED camera. 8K ultra-detailed. Shallow depth of field.
+- Lighting: Dramatic (chiaroscuro, golden hour, or professional studio lighting with deep shadows).
+- Mood: BBC/National Geographic documentary quality — awe-inspiring, visceral, emotionally engaging.
+- Quality: ultra-detailed, professional color grading, film grain, photojournalistic.
+- No text overlays, watermarks, borders, or frames in the image.
+- Add an "image_prompt" field with the full Imagen-ready prompt.
 - Target aspect ratio: 9:16 (vertical reel)
-- The image should be educational, clean, and visually stunning
 
 FOR "maths" SEGMENTS:
 - Design a detailed Manim animation specification
 - Add a "manim_spec" field with:
   - "scene_description": what the viewer should see
-  - "animations": list of animation steps (Write equations, Transform, FadeIn, etc.)
+  - "animations": list of animation steps (Write equations, Transform between equations, FadeIn, etc.)
   - "color_scheme": specific Manim color constants to use
-  - "math_elements": list of MathTex/Tex items to create
-- The specification should be detailed enough for code generation
+  - "math_elements": list of MathTex/Tex items to create, covering ALL math_expressions in order
+- Set "background_image" to true if a real-world cinematic background would enhance comprehension
+  (e.g. gravity equation → space/planet photo, photosynthesis → sunlit forest).
+  Set to false for purely abstract concepts (algebra manipulation, pure geometry, etc.).
+- When background_image is true, also add an "image_prompt" describing a dramatic, blurred
+  real-world scene relevant to the concept (it will be shown defocused behind the animation).
+
+FOR ALL SEGMENTS — OPTIONAL text overlay:
+- Add a "text_overlay" field ONLY IF the segment introduces a named concept, formula title, or
+  key term that a viewer would benefit from seeing written on screen.
+- Leave "text_overlay" COMPLETELY ABSENT for narrative, transitional, or hook segments.
+- When added: 1-2 lines maximum, only 1-3 highlight_words (the single most important term).
+  Format: {{"lines": ["Term Name"], "highlight_words": ["Term"]}}
 
 INPUT SCRIPT:
 {script_json}

@@ -53,3 +53,12 @@ IMAGEN_MODEL = "imagen-3.0-generate-002"
 
 # ── Output Directory ──
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")
+
+# ── Text Overlay Font ──
+# Set OVERLAY_FONT_PATH to a .ttf path if arial.ttf is not in the system font path.
+OVERLAY_FONT_PATH = os.getenv("OVERLAY_FONT_PATH", "arial.ttf")
+
+# ── Cloud TTS Toggle ──
+# Set USE_CLOUD_TTS=true to use Google Cloud Text-to-Speech (Neural2 voices).
+# Falls back to gTTS when false or when google-cloud-texttospeech is not installed.
+USE_CLOUD_TTS = os.getenv("USE_CLOUD_TTS", "false").lower() in ("true", "1")
