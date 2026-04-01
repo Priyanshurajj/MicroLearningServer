@@ -15,6 +15,8 @@ from moviepy import (
     ColorClip,
     CompositeVideoClip,
 )
+import moviepy.video.fx as vfx
+import moviepy.audio.fx as afx
 import imageio_ffmpeg
 
 from .config import ROUTING_MODEL, OUTPUT_DIR, OVERLAY_FONT_PATH
@@ -281,7 +283,9 @@ def _create_segment_clip(
     # ── 5. Smooth fade transitions ──
     if clip is not None:
         fade = min(0.3, clip.duration / 4)
-        clip = clip.fadein(fade).fadeout(fade)
+        clip = clip.with_effects([vfx.FadeIn(fade), vfx.FadeOut(fade)])
+        if clip.audio is not None:
+            clip.audio = clip.audio.with_effects([afx.AudioFadeIn(fade), afx.AudioFadeOut(fade)])
 
     return clip
 
