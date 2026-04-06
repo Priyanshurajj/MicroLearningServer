@@ -74,13 +74,12 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             a["video_path"] = os.path.normpath(a["video_path"])
         manim_map[a["segment_id"]] = a
 
-    # Regular images: segment_id → image asset (is_background=false)
+    # General images: segment_id → image asset
     image_map: dict[int, dict] = {}
     for img in image_data.get("images", []):
-        if not img.get("is_background", False):
-            if img.get("image_file_path"):
-                img["image_file_path"] = os.path.normpath(img["image_file_path"])
-            image_map[img["segment_id"]] = img
+        if img.get("image_file_path"):
+            img["image_file_path"] = os.path.normpath(img["image_file_path"])
+        image_map[img["segment_id"]] = img
 
     # Concept map frames: segment_id (str) → PNG path
     concept_frames: dict[str, str] = concept_map_data.get("frames", {})

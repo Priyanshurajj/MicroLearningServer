@@ -1,13 +1,7 @@
-import json
-import logging
-
 from google.adk.agents import Agent
-from google.adk.tools import ToolContext
 from google import genai
 
-from .config import get_client, TEXT_MODEL, ROUTING_MODEL
-
-logger = logging.getLogger("EduReelADK")
+from .config import TEXT_MODEL
 
 PROMPT_REVIEW_PROMPT = """You are a content safety and quality reviewer for AI-generated educational video prompts.
 
@@ -36,68 +30,22 @@ If issues found: fix them and return the corrected full JSON.
 If clean: return unchanged.
 
 INPUT ENHANCED SCRIPT JSON:
-{enhanced_script_json}
+{enhanced_script}
 
 OUTPUT: Return ONLY the corrected (or unchanged) full enhanced script JSON. No commentary.
 """
 
-
-def review_prompts(tool_context: ToolContext) -> dict:
-    """Validates and repairs enhanced_script in session state."""
-    enhanced_json = tool_context.state.get("enhanced_script", "")
-    if not enhanced_json:
-        return {"status": "skipped", "reason": "No enhanced_script in state"}
-
-    try:
-        enhanced = json.loads(enhanced_json)
-        segments = enhanced.get("segments", [])
-        if not segments:
-            return {"status": "error", "error": "Enhanced script has no segments"}
-
-        prompt = PROMPT_REVIEW_PROMPT.format(enhanced_script_json=enhanced_json)
-
-        response = get_client().models.generate_content(
-            model=TEXT_MODEL,
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
-        )
-
-        reviewed = json.loads(response.text)
-
-        # Preserve run_id
-        if "run_id" in enhanced and "run_id" not in reviewed:
-            reviewed["run_id"] = enhanced["run_id"]
-
-        reviewed_json = json.dumps(reviewed)
-        tool_context.state["enhanced_script"] = reviewed_json
-
-        logger.info(
-            f"Prompt review complete: {len(reviewed.get('segments', []))} segments reviewed"
-        )
-        return {"status": "success", "enhanced_script": reviewed_json}
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Prompt review returned invalid JSON: {e}")
-        return {"status": "error", "error": f"Review produced invalid JSON: {e}"}
-    except Exception as e:
-        logger.error(f"Prompt review failed: {e}")
-        return {"status": "error", "error": str(e)}
-
-
 prompt_review_agent = Agent(
     name="prompt_review_agent",
-    model=ROUTING_MODEL,
+    model=TEXT_MODEL,
     description=(
         "Reviews enhanced_script for content safety and structural completeness. "
         "Rewrites policy-violating image prompts and fills in missing manim_spec fields."
     ),
-    instruction=(
-        "You are the Prompt Review Agent. "
-        "Call the review_prompts tool immediately — it reads data from session state automatically. "
-        "No parameters needed. Return the tool's output as-is."
+    instruction=PROMPT_REVIEW_PROMPT,
+    output_key="enhanced_script",
+    generate_content_config=genai.types.GenerateContentConfig(
+        response_mime_type="application/json",
+        temperature=0.2,
     ),
-    tools=[review_prompts],
 )

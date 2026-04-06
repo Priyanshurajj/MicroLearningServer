@@ -1,0 +1,106 @@
+--- Manim Render Output for Segment2Scene ---
+STDOUT:
+Manim Community v0.20.1
+
+[04/06/26 20:25:34] WARNING  Output format changed to '.mov' to   utils.py:1449
+                             support transparency                              
+[04/06/26 20:25:35] INFO     Animation 0 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\3543656982_2024869229_2                         
+                             23132457.mov'                                     
+                    INFO     Animation 1 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_2845622014_2                         
+                             228160360.mov'                                    
+                    INFO     Animation 2 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_2514011427_5                         
+                             72483507.mov'                                     
+                    INFO     Animation 3 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_1847329522_1                         
+                             439881471.mov'                                    
+                    INFO     Animation 4 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_2318836581_4                         
+                             092079913.mov'                                    
+                    INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}\text{Ligh                        
+                             t Energy} \rightarrow                             
+                             \text{Chemical                                    
+                             Energy}\special{dvisvgm:ra                        
+                             w </g>} to                                        
+                             output\abf5dee1\manim\Tex\                        
+                             4a93f6944179e7fb.tex                              
+[04/06/26 20:25:39] INFO     Animation 5 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_3021181258_4                         
+                             12233080.mov'                                     
+[04/06/26 20:25:40] INFO     Animation 6 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\partial                         
+                             _movie_files\Segment2Scen                         
+                             e\1747226900_4217992463_3                         
+                             409717709.mov'                                    
+                    INFO     Combining to Movie file.  scene_file_writer.py:753
+                    INFO                               scene_file_writer.py:904
+                             File ready at                                     
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\abf5dee1\manim\out                         
+                             put\abf5dee1\manim\videos                         
+                             \segment_2\480p15\Segment                         
+                             2Scene.mov'                                       
+                                                                               
+                    INFO     Rendered Segment2Scene                scene.py:278
+                             Played 7 animations                               
+
+STDERR:
+
+Animation 0: Create(VGroup of 3 submobjects):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                                    
+
+Animation 1: FadeIn(VGroup of 2 submobjects):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                                    
+
+Animation 3: LaggedStart(Group), etc.:   0%|          | 0/38 [00:00<?, ?it/s]
+Animation 3: LaggedStart(Group), etc.:  58%|#####7    | 22/38 [00:00<00:00, 215.38it/s]
+                                                                                       
+
+Animation 5: Write(MathTex('\\text{Light Energy} \\rightarrow \\text{Chemical Energy}')):   0%|          | 0/23 [00:00<?, ?it/s]
+Animation 5: Write(MathTex('\\text{Light Energy} \\rightarrow \\text{Chemical Energy}')):  91%|#########1| 21/23 [00:00<00:00, 198.74it/s]
+                                                                                                                                          
+--------------------------------------------------

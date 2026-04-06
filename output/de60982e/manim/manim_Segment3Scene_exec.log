@@ -1,0 +1,176 @@
+--- Manim Render Output for Segment3Scene ---
+STDOUT:
+Manim Community v0.20.1
+
+[04/06/26 20:56:47] WARNING  Output format changed to '.mov' to   utils.py:1449
+                             support transparency                              
+
+STDERR:
++--------------------- Traceback (most recent call last) ---------------------+
+| C:\Users\rpriy\AppData\Local\Programs\Python\Python311\Lib\site-packages\ma |
+| nim\cli\render\commands.py:125 in render                                    |
+|                                                                             |
+|   122             try:                                                      |
+|   123                 with tempconfig({}):                                  |
+|   124                     scene = SceneClass()                              |
+| > 125                     scene.render()                                    |
+|   126             except Exception:                                         |
+|   127                 error_console.print_exception()                       |
+|   128                 sys.exit(1)                                           |
+|                                                                             |
+| C:\Users\rpriy\AppData\Local\Programs\Python\Python311\Lib\site-packages\ma |
+| nim\scene\scene.py:259 in render                                            |
+|                                                                             |
+|    256         """                                                          |
+|    257         self.setup()                                                 |
+|    258         try:                                                         |
+| >  259             self.construct()                                         |
+|    260         except EndSceneEarlyException:                               |
+|    261             pass                                                     |
+|    262         except RerunSceneException:                                  |
+|                                                                             |
+| D:\2026\POCs\EduReelADK\output\de60982e\manim\segment_3.py:33 in construct  |
+|                                                                             |
+|   30                                                                        |
+|   31         # 2. Create stomata on the leaf                                |
+|   32         stomata = VGroup(                                              |
+| > 33             Ellipse(width=0.2, height=0.1, color=DARK_GREEN, fill_opac |
+|   34             Ellipse(width=0.2, height=0.1, color=DARK_GREEN, fill_opac |
+|   35             Ellipse(width=0.2, height=0.1, color=DARK_GREEN, fill_opac |
+|   36         ).set_stroke(width=0)                                          |
++-----------------------------------------------------------------------------+
+NameError: name 'DARK_GREEN' is not defined
+--------------------------------------------------
+--- Manim Render Output for Segment3Scene ---
+STDOUT:
+Manim Community v0.20.1
+
+[04/06/26 20:58:21] WARNING  Output format changed to '.mov' to   utils.py:1449
+                             support transparency                              
+                    INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}CO_2\speci                        
+                             al{dvisvgm:raw </g>} to                           
+                             output\de60982e\manim\Tex\                        
+                             7e5b6321d77ab170.tex                              
+[04/06/26 20:58:23] INFO     Writing                    tex_file_writing.py:110
+                             \special{dvisvgm:raw <g                           
+                             id='unique000'>}H_2O\speci                        
+                             al{dvisvgm:raw </g>} to                           
+                             output\de60982e\manim\Tex\                        
+                             7fd8873e34ca3ec8.tex                              
+[04/06/26 20:58:25] INFO     Animation 0 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\3543656982_1877264336_2                         
+                             23132457.mov'                                     
+                    INFO     Animation 1 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_3394500337_2                         
+                             257570495.mov'                                    
+                    INFO     Animation 2 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_1800413871_3                         
+                             666183180.mov'                                    
+                    INFO     Animation 3 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_3394500337_1                         
+                             802675597.mov'                                    
+                    INFO     Animation 4 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_822161028_24                         
+                             24313310.mov'                                     
+                    INFO     Animation 5 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_1186159279_2                         
+                             44544332.mov'                                     
+[04/06/26 20:58:26] INFO     Animation 6 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_1469221361_1                         
+                             622576235.mov'                                    
+                    INFO     Animation 7 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_2407800670_2                         
+                             281042502.mov'                                    
+                    INFO     Animation 8 : Partial     scene_file_writer.py:601
+                             movie file written in                             
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\partial                         
+                             _movie_files\Segment3Scen                         
+                             e\1747226900_4217992463_3                         
+                             384869348.mov'                                    
+                    INFO     Combining to Movie file.  scene_file_writer.py:753
+                    INFO                               scene_file_writer.py:904
+                             File ready at                                     
+                             'D:\2026\POCs\EduReelADK\                         
+                             output\de60982e\manim\out                         
+                             put\de60982e\manim\videos                         
+                             \segment_3\480p15\Segment                         
+                             3Scene.mov'                                       
+                                                                               
+                    INFO     Rendered Segment3Scene                scene.py:278
+                             Played 9 animations                               
+
+STDERR:
+
+Animation 0: FadeIn(VGroup of 2 submobjects):   0%|          | 0/23 [00:00<?, ?it/s]
+                                                                                    
+
+Animation 2: Create(VGroup of 3 submobjects):   0%|          | 0/15 [00:00<?, ?it/s]
+                                                                                    
+
+Animation 4: MoveAlongPath(VGroup of 5 submobjects), etc.:   0%|          | 0/45 [00:00<?, ?it/s]
+Animation 4: MoveAlongPath(VGroup of 5 submobjects), etc.:  51%|#####1    | 23/45 [00:00<00:00, 223.61it/s]
+                                                                                                           
+
+Animation 5: FadeOut(VGroup of 5 submobjects):   0%|          | 0/8 [00:00<?, ?it/s]
+                                                                                    
+
+Animation 6: MoveAlongPath(VGroup of 5 submobjects), etc.:   0%|          | 0/45 [00:00<?, ?it/s]
+Animation 6: MoveAlongPath(VGroup of 5 submobjects), etc.:  69%|######8   | 31/45 [00:00<00:00, 308.44it/s]
+                                                                                                           
+
+Animation 7: FadeOut(VGroup of 5 submobjects):   0%|          | 0/8 [00:00<?, ?it/s]
+                                                                                    
+--------------------------------------------------

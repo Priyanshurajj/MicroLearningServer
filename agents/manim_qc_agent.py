@@ -38,28 +38,28 @@ Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 
 
 def execute_manim_qc(tool_context: ToolContext) -> dict:
-    """Reads manim_code_output and image_output from state, renders Manim, attaches bg images."""
+    """Reads manim_code_output and bg_image_output from state, renders Manim, attaches bg images."""
     manim_code_json = tool_context.state.get("manim_code_output", "")
-    image_output_json = tool_context.state.get("image_output", "{}")
+    bg_image_json = tool_context.state.get("bg_image_output", "{}")
     enhanced_script_json = tool_context.state.get("enhanced_script", "{}")
     if not enhanced_script_json:
         enhanced_script_json = tool_context.state.get("script_output", "{}")
 
     try:
         manim_data = json.loads(manim_code_json) if manim_code_json else {"manim_assets": []}
-        image_data = json.loads(image_output_json)
+        bg_data = json.loads(bg_image_json) if bg_image_json else {"bg_images": []}
         script_data = json.loads(enhanced_script_json)
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Manim QC: Cannot parse state: {e}")
         return {"status": "error", "error": f"Cannot parse state: {e}"}
 
-    run_id = manim_data.get("run_id") or image_data.get("run_id", "default")
+    run_id = manim_data.get("run_id") or bg_data.get("run_id", "default")
 
-    # Build background image lookup: segment_id → image_file_path (is_background=true only)
+    # Build background image lookup: segment_id → file path (from manim_bg_image_agent output)
     bg_lookup: dict[int, str] = {
         img["segment_id"]: img["image_file_path"]
-        for img in image_data.get("images", [])
-        if img.get("is_background") and img.get("image_file_path")
+        for img in bg_data.get("bg_images", [])
+        if img.get("image_file_path") and img.get("status") == "generated"
     }
 
     manim_assets = manim_data.get("manim_assets", [])
