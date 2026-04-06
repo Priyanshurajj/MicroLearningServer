@@ -201,37 +201,44 @@ import textwrap
 
 class {scene_name}(Scene):
     def construct(self):
-        card = RoundedRectangle(
-            corner_radius=0.4,
-            width=12,
-            height=6,
-            fill_color="#0f3460",
-            fill_opacity=0.3,
-            stroke_color="#e94560",
-            stroke_width=2,
+        # Subtle background grid for depth
+        grid = NumberPlane(
+            background_line_style={{"stroke_color": BLUE_E, "stroke_opacity": 0.1}},
+            axis_config={{"stroke_opacity": 0}},
+            faded_line_ratio=2,
         )
-        self.add(card)
+        self.add(grid)
 
         title_text = "{title}"
         content_text = "{narration}"
 
-        wrapped_title = textwrap.fill(title_text, width=30)
-        title_obj = Text(wrapped_title, font_size=40, color=WHITE, weight="BOLD")
-        title_obj.move_to(ORIGIN).shift(UP * 2)
+        wrapped_title = textwrap.fill(title_text, width=28)
+        title_obj = Text(wrapped_title, font_size=48, color=WHITE, weight="BOLD")
+        title_obj.to_edge(UP, buff=1.5)
 
-        accent_bar = Line(LEFT * 3, RIGHT * 3, color="#e94560", stroke_width=4)
-        accent_bar.next_to(title_obj, DOWN, buff=0.3)
+        underline = Line(
+            title_obj.get_left() + DOWN * 0.3,
+            title_obj.get_right() + DOWN * 0.3,
+            color=YELLOW,
+            stroke_width=3,
+        )
 
-        wrapped_content = textwrap.fill(content_text, width=40)
-        content_obj = Text(wrapped_content, font_size=32, color=LIGHT_GREY, line_spacing=0.8)
-        content_obj.next_to(accent_bar, DOWN, buff=0.8)
+        wrapped_content = textwrap.fill(content_text, width=38)
+        content_obj = Text(
+            wrapped_content, font_size=30, color=GREY_A, line_spacing=0.9
+        )
+        content_obj.next_to(underline, DOWN, buff=0.8)
 
-        self.play(FadeIn(card, shift=UP * 0.3), run_time=0.5)
-        self.play(Write(title_obj), run_time=1.0)
-        self.play(Create(accent_bar), run_time=0.5)
+        self.play(Write(title_obj), run_time=1.2)
+        self.play(FadeIn(underline, shift=RIGHT * 0.5), run_time=0.6)
+        self.wait(0.3)
         self.play(FadeIn(content_obj, shift=UP * 0.3), run_time=1.0)
-
         self.wait(1.5)
+        self.play(
+            *[FadeOut(mob) for mob in self.mobjects if mob is not grid],
+            run_time=0.6,
+        )
+        self.wait(0.3)
 '''
 
 

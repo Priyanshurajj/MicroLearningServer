@@ -28,11 +28,12 @@ REEL_HEIGHT = 1920
 FPS = 30
 
 # Text overlay constants
-OVERLAY_FONT_SIZE = 80
-HIGHLIGHT_RGBA = (255, 220, 0, 245)
-HIGHLIGHT_TEXT_RGBA = (140, 70, 0, 255)   # warm amber on yellow
-TEXT_RGBA = (15, 15, 15, 255)             # near-black on frosted panel
-PANEL_RGBA = (255, 255, 255, 185)         # frosted white panel behind text block
+OVERLAY_FONT_SIZE = 78
+HIGHLIGHT_BG_RGBA = (255, 210, 0, 220)    # vibrant yellow pill behind keyword
+HIGHLIGHT_TEXT_RGBA = (20, 20, 20, 255)   # near-black text on yellow pill
+TEXT_RGBA = (255, 255, 255, 255)           # bright white text (no panel)
+SHADOW_RGBA = (0, 0, 0, 180)              # dark shadow for readability
+SHADOW_OFFSET = 3                          # px offset for text shadow
 OVERLAY_Y_RATIO = 0.42                    # vertically centered
 LINE_SPACING = 28
 
@@ -334,7 +335,8 @@ def _create_manim_with_background(
 def _render_text_overlay_pil(
     text_overlay: dict, width: int, height: int, duration: float
 ) -> ImageClip:
-    """Renders a text overlay with frosted panel and tight yellow word highlights."""
+    """Renders a text overlay with NO background panel — just shadowed white text
+    and vibrant yellow pill highlights on keywords.  Transparent everywhere else."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -346,42 +348,24 @@ def _render_text_overlay_pil(
     lines = text_overlay.get("lines", [])
     highlight_words = {w.lower().strip(".,!?") for w in text_overlay.get("highlight_words", [])}
 
-    h_pad = 12   # horizontal padding inside highlight rect
-    v_pad = 10   # vertical padding inside highlight rect
-    panel_margin = 20
+    h_pad = 16   # horizontal padding inside highlight pill
+    v_pad = 8    # vertical padding inside highlight pill
 
-    # Measure line heights/widths for panel sizing
-    sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
-    line_h = sample_bbox[3] - sample_bbox[1]
+    # ── Measure line height using a reference glyph ──
+    ref_bbox = draw.textbbox((0, 0), "Ag", font=font)
+    ref_y0 = ref_bbox[1]          # y-offset from anchor to top of glyphs
+    line_h = ref_bbox[3] - ref_bbox[1]
 
     total_block_h = len(lines) * (line_h + LINE_SPACING) - LINE_SPACING
     block_top = int(height * OVERLAY_Y_RATIO) - total_block_h // 2
 
-    max_line_w = 0
-    for line in lines:
-        words = line.split()
-        lw = sum(
-            draw.textbbox((0, 0), w + " ", font=font)[2]
-            - draw.textbbox((0, 0), w + " ", font=font)[0]
-            for w in words
-        )
-        max_line_w = max(max_line_w, lw)
-
-    panel_x0 = (width - max_line_w) // 2 - panel_margin
-    panel_y0 = block_top - panel_margin
-    panel_x1 = (width + max_line_w) // 2 + panel_margin
-    panel_y1 = block_top + total_block_h + panel_margin
-    draw.rounded_rectangle(
-        [panel_x0, panel_y0, panel_x1, panel_y1],
-        radius=18,
-        fill=PANEL_RGBA,
-    )
+    # ── No panel — transparent background ──
 
     y = block_top
     for line in lines:
         words = line.split()
 
-        # Advance widths (word + space) for x-positioning
+        # Advance widths (word + trailing space) for x-positioning
         advance_widths = []
         for word in words:
             bbox = draw.textbbox((0, 0), word + " ", font=font)
@@ -393,19 +377,32 @@ def _render_text_overlay_pil(
         for word, adv_w in zip(words, advance_widths):
             clean = word.lower().strip(".,!?")
 
-            # Word-only width for tight highlight rect
+            # Word-only bbox — needed for highlight rect sizing
             word_bbox = draw.textbbox((0, 0), word, font=font)
-            word_only_w = word_bbox[2] - word_bbox[0]
-            word_h = word_bbox[3] - word_bbox[1]
+            wb_x0, wb_y0, wb_x1, wb_y1 = word_bbox
+            word_only_w = wb_x1 - wb_x0
+            word_only_h = wb_y1 - wb_y0
+
+            # Actual glyph top relative to anchor (y) — accounts for font ascent
+            glyph_top = y + wb_y0
 
             if clean in highlight_words:
-                rect = [
-                    x - h_pad, y - v_pad,
-                    x + word_only_w + h_pad, y + word_h + v_pad,
+                # ── Yellow pill highlight ──
+                pill_rect = [
+                    x + wb_x0 - h_pad,
+                    glyph_top - v_pad,
+                    x + wb_x0 + word_only_w + h_pad,
+                    glyph_top + word_only_h + v_pad,
                 ]
-                draw.rounded_rectangle(rect, radius=8, fill=HIGHLIGHT_RGBA)
+                draw.rounded_rectangle(pill_rect, radius=12, fill=HIGHLIGHT_BG_RGBA)
+                # Dark text on yellow pill (shadow not needed)
                 draw.text((x, y), word, font=font, fill=HIGHLIGHT_TEXT_RGBA)
             else:
+                # ── Shadowed white text (no panel, readable on any bg) ──
+                draw.text(
+                    (x + SHADOW_OFFSET, y + SHADOW_OFFSET),
+                    word, font=font, fill=SHADOW_RGBA,
+                )
                 draw.text((x, y), word, font=font, fill=TEXT_RGBA)
 
             x += adv_w

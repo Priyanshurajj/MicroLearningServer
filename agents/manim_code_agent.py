@@ -11,47 +11,90 @@ from .config import get_client, CODE_MODEL, ROUTING_MODEL, OUTPUT_DIR
 
 logger = logging.getLogger("EduReelADK")
 
-MANIM_CODE_PROMPT = """You are an expert Manim Community Edition animator producing 3Blue1Brown-quality educational videos.
+MANIM_CODE_PROMPT = """You are an elite Manim Community Edition animator producing cinematic, 3Blue1Brown-quality educational animations.
 Generate a complete, self-contained Manim script for the following segment.
 
 ─── MANDATORY REQUIREMENTS ───────────────────────────────────────────────────
 - `from manim import *` — only import
 - Exactly ONE Scene class named `Segment{segment_id}Scene`
 - Must render with `manim render -ql` — zero errors
-- No external files, no images
+- No external files, no images, no SVGs
 - Target duration: ~{duration} seconds
 
 ─── VISUAL STYLE ─────────────────────────────────────────────────────────────
-- Background: BLACK (default Manim dark — do not change)
-- Main equations (MathTex): font_size=66, color=WHITE
-- Supporting labels (Tex): font_size=48, color=LIGHT_GREY
-- Results / key terms: color=YELLOW
-- Accent geometry / arrows: BLUE_B or TEAL
-- Color palette: maximum 4 colors per scene — WHITE, YELLOW, BLUE_B, TEAL
-- Spacing: minimum 0.8 MU between elements; use .to_edge(), .next_to(), .shift() — never hardcode pixel coordinates
-- Always VGroup() related elements before animating them together
-- Never let elements overlap
+Background & Depth:
+- Keep default BLACK background
+- Add a subtle grid or faint coordinate plane for math scenes when appropriate:
+    grid = NumberPlane(background_line_style={{"stroke_color": BLUE_E, "stroke_opacity": 0.15}})
+- Use a thin decorative underline (Line or Underline) beneath titles for polish
+
+Typography & Color Palette:
+- Title (Tex): font_size=52, color=WHITE, weight=BOLD
+- Main equations (MathTex): font_size=64, color=WHITE
+- Intermediate steps or labels (Tex): font_size=42, color=GREY_A
+- Key result / answer: color=YELLOW  — highlight with SurroundingRectangle(color=YELLOW, buff=0.2, corner_radius=0.1)
+- Accent geometry: BLUE_C, TEAL_C
+- Error / warning: RED_C
+- Strict 4-color maximum per scene: WHITE, YELLOW, BLUE_C, TEAL_C
+
+Layout & Spacing:
+- Minimum 0.8 MU between elements — use .next_to(buff=0.5), .to_edge(), .shift()
+- Never hardcode pixel coordinates
+- VGroup() related elements and use .arrange(DOWN, buff=0.6) for vertical stacks
+- Center primary content; secondary content to edges
 
 ─── ANIMATION CHOREOGRAPHY ───────────────────────────────────────────────────
-1. Title/concept intro:  Write(title_obj, run_time=1.5)
-2. Each equation entry:  FadeIn(eq, shift=DOWN*0.3, run_time=1.0)
-3. Equation morphing:    ReplacementTransform(eq_old, eq_new, run_time=1.5)
-4. Emphasis on key term: Circumscribe(target, color=YELLOW, run_time=0.8)
-5. Arrows / connectors:  GrowArrow(arrow) or Create(arrow)
-6. Fade out stale elements before introducing new ones: FadeOut(old_group, run_time=0.5)
-7. Final hold:           self.wait(2.0)
+Pacing — smooth, deliberate, cinematic:
+
+1. OPENING (0-2s):
+   - Write(title, run_time=1.2) then self.wait(0.4)
+   - FadeIn(underline, shift=RIGHT*0.5, run_time=0.6)
+
+2. BUILDING CONTENT (middle):
+   - Equations: FadeIn(eq, shift=UP*0.3, run_time=0.8)
+   - Derivation flow: TransformMatchingTex(old_eq, new_eq, run_time=1.5) — preferred over ReplacementTransform for MathTex
+   - If TransformMatchingTex is not suitable, use ReplacementTransform(old, new, run_time=1.5)
+   - Labels / annotations: Write(label, run_time=0.8), or FadeIn(label, shift=DOWN*0.2)
+   - Arrows or pointers: GrowArrow(arrow, run_time=0.6)
+   - Geometry: Create(shape, run_time=1.0) or DrawBorderThenFill(shape, run_time=1.2)
+   - Add self.wait(0.3) between major steps for breathing room
+
+3. EMPHASIS / REVEAL:
+   - Key result: Circumscribe(target, color=YELLOW, run_time=1.0, fade_out=True)
+   - Alternative: Indicate(target, color=YELLOW, scale_factor=1.1, run_time=0.8)
+   - Box a final answer: SurroundingRectangle(answer, color=YELLOW, buff=0.2, corner_radius=0.1)
+
+4. TRANSITIONS between sections:
+   - FadeOut(*old_group, shift=DOWN*0.3, run_time=0.5) before new content
+   - Or: old_group.animate.shift(UP*3).set_opacity(0) with run_time=0.8
+
+5. CLOSING (last 1-2s):
+   - self.play(*[FadeOut(mob) for mob in self.mobjects if mob is not None], run_time=0.6)
+   - self.wait(0.5)
+
+─── ADVANCED TECHNIQUES (use where appropriate) ──────────────────────────────
+- Progressive reveal: Show equation parts one-by-one using .set_opacity(0) then .animate.set_opacity(1)
+- Number line / Axes for graphing: use Axes() with proper ranges and labels
+- Brace + label: Brace(target, direction=DOWN) with label.next_to(brace, DOWN)
+- Tracker animations: ValueTracker for smooth parameter changes
+- Color transforms: target.animate.set_color(YELLOW) to highlight dynamically
 
 ─── PROHIBITED ───────────────────────────────────────────────────────────────
-- Flash() — causes render failures
+- Flash() — causes render failures in some environments
 - ShowCreation() — deprecated, use Create() instead
-- Hardcoded pixel coordinates
-- Font sizes below 36
+- Hardcoded pixel coordinates — always use relative positioning
+- Font sizes below 32
 - More than 4 colors in one scene
+- Overlapping elements — always check spacing
+- self.camera.frame operations (not supported in -ql mode without MovingCameraScene)
+- Using MovingCameraScene (stick to Scene for reliability)
 
 ─── MULTIPLE EQUATIONS ───────────────────────────────────────────────────────
 If math_expressions has more than one item, show them IN SEQUENCE.
-Use ReplacementTransform() to morph consecutive equations to show derivation flow.
-Space animations to fill the full target duration.
+Prefer TransformMatchingTex() for MathTex morphing to show derivation flow.
+Fade out previous equation groups before introducing unrelated new content.
+Space animations evenly to fill the full target duration.
+Add self.wait(0.3-0.5) between each major animation step.
 
 ─── SEGMENT DETAILS ──────────────────────────────────────────────────────────
 - Narration: {narration}
