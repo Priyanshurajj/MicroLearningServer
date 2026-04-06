@@ -11,29 +11,49 @@ from .config import get_client, CODE_MODEL, ROUTING_MODEL, OUTPUT_DIR
 
 logger = logging.getLogger("EduReelADK")
 
-MANIM_CODE_PROMPT = """You are an expert Manim Community Edition (manim) Python developer.
-Generate a complete, self-contained Manim script for the following educational animation.
+MANIM_CODE_PROMPT = """You are an expert Manim Community Edition animator producing 3Blue1Brown-quality educational videos.
+Generate a complete, self-contained Manim script for the following segment.
 
-REQUIREMENTS:
-- Import everything from manim: `from manim import *`
-- Create exactly ONE Scene class named `Segment{segment_id}Scene`
-- Use a DARK background (default Manim)
-- Use MathTex for LaTeX math expressions, Tex for regular text
-- Include smooth animations: Write, FadeIn, FadeOut, Transform, Create
-- Add self.wait() calls between animations for pacing
-- Target duration: approximately {duration} seconds
-- Use vibrant colors: BLUE, YELLOW, GREEN, RED, WHITE for text
-- For geometry: use Circle, Square, Line, Arrow, Polygon, etc.
-- For graphs: use Axes, NumberPlane if applicable
-- End with self.wait(1) to hold the final frame
-- Code must be error-free and executable with `manim render -ql`
-- DO NOT use any external files or images
-- DO NOT use deprecated Manim API calls
-- If multiple math_expressions are provided, animate them IN SEQUENCE.
-  Use Transform() or ReplacementTransform() to morph between consecutive equations
-  to show derivation flow. Space them out to fill the target duration.
+─── MANDATORY REQUIREMENTS ───────────────────────────────────────────────────
+- `from manim import *` — only import
+- Exactly ONE Scene class named `Segment{segment_id}Scene`
+- Must render with `manim render -ql` — zero errors
+- No external files, no images
+- Target duration: ~{duration} seconds
 
-SEGMENT DETAILS:
+─── VISUAL STYLE ─────────────────────────────────────────────────────────────
+- Background: BLACK (default Manim dark — do not change)
+- Main equations (MathTex): font_size=66, color=WHITE
+- Supporting labels (Tex): font_size=48, color=LIGHT_GREY
+- Results / key terms: color=YELLOW
+- Accent geometry / arrows: BLUE_B or TEAL
+- Color palette: maximum 4 colors per scene — WHITE, YELLOW, BLUE_B, TEAL
+- Spacing: minimum 0.8 MU between elements; use .to_edge(), .next_to(), .shift() — never hardcode pixel coordinates
+- Always VGroup() related elements before animating them together
+- Never let elements overlap
+
+─── ANIMATION CHOREOGRAPHY ───────────────────────────────────────────────────
+1. Title/concept intro:  Write(title_obj, run_time=1.5)
+2. Each equation entry:  FadeIn(eq, shift=DOWN*0.3, run_time=1.0)
+3. Equation morphing:    ReplacementTransform(eq_old, eq_new, run_time=1.5)
+4. Emphasis on key term: Circumscribe(target, color=YELLOW, run_time=0.8)
+5. Arrows / connectors:  GrowArrow(arrow) or Create(arrow)
+6. Fade out stale elements before introducing new ones: FadeOut(old_group, run_time=0.5)
+7. Final hold:           self.wait(2.0)
+
+─── PROHIBITED ───────────────────────────────────────────────────────────────
+- Flash() — causes render failures
+- ShowCreation() — deprecated, use Create() instead
+- Hardcoded pixel coordinates
+- Font sizes below 36
+- More than 4 colors in one scene
+
+─── MULTIPLE EQUATIONS ───────────────────────────────────────────────────────
+If math_expressions has more than one item, show them IN SEQUENCE.
+Use ReplacementTransform() to morph consecutive equations to show derivation flow.
+Space animations to fill the full target duration.
+
+─── SEGMENT DETAILS ──────────────────────────────────────────────────────────
 - Narration: {narration}
 - Visual Description: {visual_description}
 - Math Expressions (animate in order): {math_expressions}

@@ -28,11 +28,13 @@ REEL_HEIGHT = 1920
 FPS = 30
 
 # Text overlay constants
-OVERLAY_FONT_SIZE = 52
-HIGHLIGHT_RGBA = (255, 220, 0, 230)
-TEXT_RGBA = (255, 255, 255, 255)
-SHADOW_RGBA = (0, 0, 0, 160)
-OVERLAY_Y_RATIO = 0.72   # Text block starts at 72% down the frame
+OVERLAY_FONT_SIZE = 80
+HIGHLIGHT_RGBA = (255, 220, 0, 245)
+HIGHLIGHT_TEXT_RGBA = (140, 70, 0, 255)   # warm amber on yellow
+TEXT_RGBA = (15, 15, 15, 255)             # near-black on frosted panel
+PANEL_RGBA = (255, 255, 255, 185)         # frosted white panel behind text block
+OVERLAY_Y_RATIO = 0.42                    # vertically centered
+LINE_SPACING = 28
 
 # Concept map overlay position (top-right, 20px margin)
 CONCEPT_MAP_W = 240
@@ -332,7 +334,7 @@ def _create_manim_with_background(
 def _render_text_overlay_pil(
     text_overlay: dict, width: int, height: int, duration: float
 ) -> ImageClip:
-    """Renders a text overlay with optional yellow word highlighting using PIL."""
+    """Renders a text overlay with frosted panel and tight yellow word highlights."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -344,44 +346,71 @@ def _render_text_overlay_pil(
     lines = text_overlay.get("lines", [])
     highlight_words = {w.lower().strip(".,!?") for w in text_overlay.get("highlight_words", [])}
 
-    y = int(height * OVERLAY_Y_RATIO)
-    h_pad = 10   # horizontal padding inside highlight rect
-    v_pad = 8    # vertical padding inside highlight rect
+    h_pad = 12   # horizontal padding inside highlight rect
+    v_pad = 10   # vertical padding inside highlight rect
+    panel_margin = 20
 
+    # Measure line heights/widths for panel sizing
+    sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
+    line_h = sample_bbox[3] - sample_bbox[1]
+
+    total_block_h = len(lines) * (line_h + LINE_SPACING) - LINE_SPACING
+    block_top = int(height * OVERLAY_Y_RATIO) - total_block_h // 2
+
+    max_line_w = 0
+    for line in lines:
+        words = line.split()
+        lw = sum(
+            draw.textbbox((0, 0), w + " ", font=font)[2]
+            - draw.textbbox((0, 0), w + " ", font=font)[0]
+            for w in words
+        )
+        max_line_w = max(max_line_w, lw)
+
+    panel_x0 = (width - max_line_w) // 2 - panel_margin
+    panel_y0 = block_top - panel_margin
+    panel_x1 = (width + max_line_w) // 2 + panel_margin
+    panel_y1 = block_top + total_block_h + panel_margin
+    draw.rounded_rectangle(
+        [panel_x0, panel_y0, panel_x1, panel_y1],
+        radius=18,
+        fill=PANEL_RGBA,
+    )
+
+    y = block_top
     for line in lines:
         words = line.split()
 
-        # Measure total line width for centering
-        word_widths = []
+        # Advance widths (word + space) for x-positioning
+        advance_widths = []
         for word in words:
             bbox = draw.textbbox((0, 0), word + " ", font=font)
-            word_widths.append(bbox[2] - bbox[0])
+            advance_widths.append(bbox[2] - bbox[0])
 
-        total_w = sum(word_widths)
+        total_w = sum(advance_widths)
         x = (width - total_w) // 2
 
-        for word, word_w in zip(words, word_widths):
+        for word, adv_w in zip(words, advance_widths):
             clean = word.lower().strip(".,!?")
-            bbox = draw.textbbox((x, y), word, font=font)
-            word_h = bbox[3] - bbox[1]
+
+            # Word-only width for tight highlight rect
+            word_bbox = draw.textbbox((0, 0), word, font=font)
+            word_only_w = word_bbox[2] - word_bbox[0]
+            word_h = word_bbox[3] - word_bbox[1]
 
             if clean in highlight_words:
                 rect = [
                     x - h_pad, y - v_pad,
-                    x + word_w - h_pad // 2 + h_pad, y + word_h + v_pad,
+                    x + word_only_w + h_pad, y + word_h + v_pad,
                 ]
-                draw.rounded_rectangle(rect, radius=6, fill=HIGHLIGHT_RGBA)
-                draw.text((x, y), word, font=font, fill=(20, 20, 20, 255))
+                draw.rounded_rectangle(rect, radius=8, fill=HIGHLIGHT_RGBA)
+                draw.text((x, y), word, font=font, fill=HIGHLIGHT_TEXT_RGBA)
             else:
-                draw.text((x + 2, y + 2), word, font=font, fill=SHADOW_RGBA)
                 draw.text((x, y), word, font=font, fill=TEXT_RGBA)
 
-            x += word_w
+            x += adv_w
 
-        # Line spacing
-        sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
-        line_h = sample_bbox[3] - sample_bbox[1]
-        y += line_h + 16
+        y += line_h + LINE_SPACING
 
     return ImageClip(np.array(img)).with_duration(duration)
 
