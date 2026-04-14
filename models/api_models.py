@@ -5,7 +5,6 @@ from typing import List
 class GenerateRequest(BaseModel):
     transcript: str = Field(
         ...,
-        min_length=10,
         description="The transcript or topic text to generate an educational reel from.",
         examples=[
             "Photosynthesis is the process by which plants convert sunlight into energy...",

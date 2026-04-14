@@ -118,7 +118,7 @@ def compose_final_video(tool_context: ToolContext) -> dict:
         return {"status": "error", "error": "No clips were created."}
 
     try:
-        final_video = concatenate_videoclips(clips, method="chain")
+        final_video = concatenate_videoclips(clips, method="compose")
 
         temp_video = os.path.join(os.path.dirname(output_path), "temp_video.mp4")
         temp_audio = os.path.join(os.path.dirname(output_path), "temp_audio.mp3")
@@ -214,7 +214,7 @@ def _create_segment_clip(
                 manim_clip = manim_clip.resized(height=REEL_HEIGHT)
                 if manim_clip.w != REEL_WIDTH:
                     manim_clip = manim_clip.resized(width=REEL_WIDTH)
-                clip = manim_clip
+                clip = manim_clip.with_position((0, 0))
         else:
             clip = _create_fallback_clip(duration)
 
@@ -225,7 +225,7 @@ def _create_segment_clip(
             clip = clip.resized(height=REEL_HEIGHT)
             if clip.w != REEL_WIDTH:
                 clip = clip.resized(width=REEL_WIDTH)
-            clip = clip.with_duration(duration)
+            clip = clip.with_duration(duration).with_position((0, 0))
         else:
             clip = _create_fallback_clip(duration)
     else:
@@ -241,6 +241,7 @@ def _create_segment_clip(
             clip = CompositeVideoClip(
                 [clip, overlay_clip],
                 size=(REEL_WIDTH, REEL_HEIGHT),
+                use_bgclip=True,
             )
         except Exception as e:
             logger.warning(f"Text overlay failed for segment {seg.get('segment_id')}: {e}")
