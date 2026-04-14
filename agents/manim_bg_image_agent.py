@@ -15,11 +15,6 @@ logger = logging.getLogger("EduReelADK")
 
 
 def generate_manim_bg_images(tool_context: ToolContext) -> dict:
-    """Generates blurred background images for manim segments that have background_image: true.
-
-    Runs inside manim_pipeline (after creative_director, before manim_qc_agent),
-    keeping the manim pipeline fully self-contained. Writes to bg_image_output.
-    """
     script_json = tool_context.state.get("enhanced_script", "")
     if not script_json:
         script_json = tool_context.state.get("script_output", "")
@@ -76,7 +71,6 @@ def generate_manim_bg_images(tool_context: ToolContext) -> dict:
 
 
 def _generate_single_bg_image(seg: dict, images_dir: str) -> dict:
-    """Generates one blurred/moody background image for a manim segment."""
     seg_id = seg["segment_id"]
     output_path = os.path.join(images_dir, f"bg_segment_{seg_id}.png")
 

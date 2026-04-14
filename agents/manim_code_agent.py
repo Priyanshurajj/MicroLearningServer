@@ -107,7 +107,6 @@ Return ONLY the Python code. No explanations, no markdown code blocks.
 
 
 def generate_manim_code(tool_context: ToolContext) -> dict:
-    """Reads enhanced_script from state and generates Manim code for all manim segments."""
     script_json = tool_context.state.get("enhanced_script", "")
     if not script_json:
         script_json = tool_context.state.get("script_output", "")
@@ -163,11 +162,9 @@ def generate_manim_code(tool_context: ToolContext) -> dict:
 
 
 def _generate_single_manim_code(seg: dict, manim_dir: str) -> dict:
-    """Generates Manim Python code for one manim segment."""
     seg_id = seg["segment_id"]
     code_path = os.path.join(manim_dir, f"segment_{seg_id}.py")
 
-    # Support both math_expressions[] and legacy math_expression
     math_exprs = seg.get("math_expressions") or (
         [seg["math_expression"]] if seg.get("math_expression") else []
     )

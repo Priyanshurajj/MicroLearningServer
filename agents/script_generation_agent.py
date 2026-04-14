@@ -63,7 +63,6 @@ OUTPUT FORMAT (strict JSON):
 
 
 def generate_script(transcript: str, tool_context: ToolContext) -> dict:
-    """Generates a structured educational video script from a transcript using Gemini."""
     try:
         prompt = SCRIPT_GENERATION_PROMPT.format(transcript=transcript)
 
@@ -85,7 +84,7 @@ def generate_script(transcript: str, tool_context: ToolContext) -> dict:
 
         # Create output directories for this run
         run_dir = os.path.join(OUTPUT_DIR, run_id)
-        for subdir in ["audio", "images", "manim", "concept_map"]:
+        for subdir in ["audio", "images", "manim"]:
             os.makedirs(os.path.join(run_dir, subdir), exist_ok=True)
 
         logger.info(

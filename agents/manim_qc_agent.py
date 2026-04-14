@@ -38,7 +38,6 @@ Return ONLY the corrected Python code. No explanations, no markdown code blocks.
 
 
 def execute_manim_qc(tool_context: ToolContext) -> dict:
-    """Reads manim_code_output and bg_image_output from state, renders Manim, attaches bg images."""
     manim_code_json = tool_context.state.get("manim_code_output", "")
     bg_image_json = tool_context.state.get("bg_image_output", "{}")
     enhanced_script_json = tool_context.state.get("enhanced_script", "{}")
@@ -98,7 +97,6 @@ def execute_manim_qc(tool_context: ToolContext) -> dict:
 
 
 def _render_manim_with_retry(asset: dict, run_id: str, script_data: dict) -> dict:
-    """Attempt to render Manim code, auto-fix on failure up to MAX_FIX_ATTEMPTS times, then fallback."""
     code_path = asset.get("code_file_path", "")
     scene_name = asset.get("scene_name", "")
     seg_id = asset.get("segment_id")
@@ -243,7 +241,6 @@ class {scene_name}(Scene):
 
 
 def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple[bool, str]:
-    """Runs manim render as a subprocess. Returns (success, error_output)."""
     try:
         result = subprocess.run(
             [
@@ -291,7 +288,6 @@ def _run_manim_render(code_path: str, scene_name: str, output_dir: str) -> tuple
 
 
 def _find_rendered_video(manim_dir: str, scene_name: str) -> str | None:
-    """Searches for the rendered video file in Manim's output structure."""
     for root, _, files in os.walk(manim_dir):
         for f in files:
             if (f.endswith(".mp4") or f.endswith(".mov") or f.endswith(".webm")) and scene_name in f:
@@ -300,7 +296,6 @@ def _find_rendered_video(manim_dir: str, scene_name: str) -> str | None:
 
 
 def _auto_fix_code(code_path: str, error_output: str) -> bool:
-    """Uses Gemini 2.5 Pro to fix broken Manim code."""
     try:
         with open(code_path, "r", encoding="utf-8") as f:
             original_code = f.read()

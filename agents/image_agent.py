@@ -15,7 +15,6 @@ logger = logging.getLogger("EduReelADK")
 
 
 def generate_images(tool_context: ToolContext) -> dict:
-    """Reads enhanced_script from state and generates Imagen images for general segments only."""
     script_json = tool_context.state.get("enhanced_script", "")
     if not script_json:
         script_json = tool_context.state.get("script_output", "")
@@ -66,7 +65,6 @@ def generate_images(tool_context: ToolContext) -> dict:
 
 
 def _generate_single_image(seg: dict, images_dir: str) -> dict:
-    """Generates one cinematic image for a general segment."""
     seg_id = seg["segment_id"]
     output_path = os.path.join(images_dir, f"segment_{seg_id}.png")
 

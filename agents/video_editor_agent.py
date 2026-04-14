@@ -37,22 +37,12 @@ SHADOW_OFFSET = 3                          # px offset for text shadow
 OVERLAY_Y_RATIO = 0.42                    # vertically centered
 LINE_SPACING = 28
 
-# Concept map overlay position (top-right, 20px margin)
-CONCEPT_MAP_W = 240
-CONCEPT_MAP_MARGIN = 20
-
-
 def compose_final_video(tool_context: ToolContext) -> dict:
-    """Reads enhanced_script, tts_output, qc_output, image_output, concept_map_output
-    from session state and composes the final reel MP4."""
     try:
         script = json.loads(tool_context.state.get("enhanced_script", "{}"))
         tts_data = json.loads(tool_context.state.get("tts_output", "{}"))
         qc_data = json.loads(tool_context.state.get("qc_output", "{}"))
         image_data = json.loads(tool_context.state.get("image_output", "{}"))
-        concept_map_data = json.loads(
-            tool_context.state.get("concept_map_output", "{}")
-        )
     except (json.JSONDecodeError, TypeError) as e:
         return {"status": "error", "error": f"Invalid JSON in state: {e}"}
 
@@ -84,9 +74,6 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             img["image_file_path"] = os.path.normpath(img["image_file_path"])
         image_map[img["segment_id"]] = img
 
-    # Concept map frames: segment_id (str) → PNG path
-    concept_frames: dict[str, str] = concept_map_data.get("frames", {})
-
     clips = []
     timeline = []
     current_time = 0.0
@@ -101,12 +88,10 @@ def compose_final_video(tool_context: ToolContext) -> dict:
         audio_duration = audio_info.get(
             "duration_seconds", seg.get("duration_seconds", 5.0)
         )
-        concept_frame_path = concept_frames.get(str(seg_id), "")
-
         try:
             clip = _create_segment_clip(
                 seg, manim_asset, image_asset,
-                audio_path, audio_duration, concept_frame_path,
+                audio_path, audio_duration,
             )
             if clip is not None:
                 clips.append(clip)
@@ -213,10 +198,7 @@ def _create_segment_clip(
     image_asset: dict | None,
     audio_path: str,
     duration: float,
-    concept_frame_path: str,
 ):
-    """Builds a single segment clip with optional background, text overlay, and concept map."""
-
     # ── 1. Base clip ──
     if manim_asset and manim_asset.get("status") == "rendered":
         video_path = manim_asset.get("video_path", "")
@@ -261,28 +243,14 @@ def _create_segment_clip(
         except Exception as e:
             logger.warning(f"Text overlay failed for segment {seg.get('segment_id')}: {e}")
 
-    # ── 3. Concept map overlay (top-right corner) ──
-    if concept_frame_path and os.path.exists(concept_frame_path) and clip is not None:
-        try:
-            map_clip = ImageClip(concept_frame_path).with_duration(clip.duration)
-            x_pos = REEL_WIDTH - CONCEPT_MAP_W - CONCEPT_MAP_MARGIN
-            clip = CompositeVideoClip(
-                [clip, map_clip.with_position((x_pos, CONCEPT_MAP_MARGIN))],
-                size=(REEL_WIDTH, REEL_HEIGHT),
-            )
-        except Exception as e:
-            logger.warning(
-                f"Concept map overlay failed for segment {seg.get('segment_id')}: {e}"
-            )
-
-    # ── 4. Attach audio ──
+    # ── 3. Attach audio ──
     if clip and audio_path and os.path.exists(audio_path):
         audio = AudioFileClip(audio_path)
         if abs(clip.duration - audio.duration) > 0.5:
             clip = clip.with_duration(audio.duration)
         clip = clip.with_audio(audio)
 
-    # ── 5. Smooth fade transitions ──
+    # ── 4. Smooth fade transitions ──
     if clip is not None:
         fade = min(0.3, clip.duration / 4)
         clip = clip.with_effects([vfx.FadeIn(fade), vfx.FadeOut(fade)])
@@ -295,7 +263,6 @@ def _create_segment_clip(
 def _create_manim_with_background(
     video_path: str, bg_path: str, duration: float
 ):
-    """Composites a transparent Manim animation natively over an unblurred background image."""
     pil_bg = Image.open(bg_path).convert("RGB")
     pil_bg = pil_bg.resize((REEL_WIDTH, REEL_HEIGHT), Image.LANCZOS)
     # No blurring or massive darkening — keep it cinematic. We dim slightly (85%) for contrast.
@@ -335,8 +302,6 @@ def _create_manim_with_background(
 def _render_text_overlay_pil(
     text_overlay: dict, width: int, height: int, duration: float
 ) -> ImageClip:
-    """Renders a text overlay with NO background panel — just shadowed white text
-    and vibrant yellow pill highlights on keywords.  Transparent everywhere else."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -348,8 +313,8 @@ def _render_text_overlay_pil(
     lines = text_overlay.get("lines", [])
     highlight_words = {w.lower().strip(".,!?") for w in text_overlay.get("highlight_words", [])}
 
-    h_pad = 16   # horizontal padding inside highlight pill
-    v_pad = 8    # vertical padding inside highlight pill
+    h_pad = 16
+    v_pad = 8
 
     # ── Measure line height using a reference glyph ──
     ref_bbox = draw.textbbox((0, 0), "Ag", font=font)
