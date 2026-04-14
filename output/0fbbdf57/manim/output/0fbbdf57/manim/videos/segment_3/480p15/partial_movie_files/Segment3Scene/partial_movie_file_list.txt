@@ -1,6 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:D:/2026/POCs/EduReelADK/output/0fbbdf57/manim/output/0fbbdf57/manim/videos/segment_3/480p15/partial_movie_files/Segment3Scene/3543656982_3443065879_223132457.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/0fbbdf57/manim/output/0fbbdf57/manim/videos/segment_3/480p15/partial_movie_files/Segment3Scene/1747226900_1133678094_3476742750.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/0fbbdf57/manim/output/0fbbdf57/manim/videos/segment_3/480p15/partial_movie_files/Segment3Scene/1747226900_2045637733_3005724132.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/0fbbdf57/manim/output/0fbbdf57/manim/videos/segment_3/480p15/partial_movie_files/Segment3Scene/1747226900_1505020558_798271921.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/0fbbdf57/manim/output/0fbbdf57/manim/videos/segment_3/480p15/partial_movie_files/Segment3Scene/1747226900_2950721455_1853930156.mov'

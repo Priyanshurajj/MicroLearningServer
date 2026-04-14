@@ -1,8 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/3543656982_2024869229_223132457.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_2845622014_2228160360.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_2514011427_572483507.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_1847329522_1439881471.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_2318836581_4092079913.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_3021181258_412233080.mov'
-file 'file:D:/2026/POCs/EduReelADK/output/abf5dee1/manim/output/abf5dee1/manim/videos/segment_2/480p15/partial_movie_files/Segment2Scene/1747226900_4217992463_3409717709.mov'

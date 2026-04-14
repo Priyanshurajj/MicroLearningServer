@@ -1,9 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/1584795214_2574473371_1206111939.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_2571421678_3008678488.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_4272076622_1180895966.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_776478714_1445035307.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_910579789_4001934983.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_2576020560_2653630554.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_3879742308_916089825.mp4'
-file 'file:D:/2026/POCs/EduReelADK/output/4c273051/manim/output/4c273051/manim/videos/segment_4/480p15/partial_movie_files/Segment4Scene/4072820271_4217992463_3468138707.mp4'
