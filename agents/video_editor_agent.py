@@ -25,7 +25,7 @@ logger = logging.getLogger("EduReelADK")
 
 REEL_WIDTH = 1080
 REEL_HEIGHT = 1920
-FPS = 30
+FPS = 24
 
 # Text overlay constants
 OVERLAY_FONT_SIZE = 78
@@ -118,7 +118,7 @@ def compose_final_video(tool_context: ToolContext) -> dict:
         return {"status": "error", "error": "No clips were created."}
 
     try:
-        final_video = concatenate_videoclips(clips, method="compose")
+        final_video = concatenate_videoclips(clips, method="chain")
 
         temp_video = os.path.join(os.path.dirname(output_path), "temp_video.mp4")
         temp_audio = os.path.join(os.path.dirname(output_path), "temp_audio.mp3")
@@ -127,6 +127,8 @@ def compose_final_video(tool_context: ToolContext) -> dict:
             temp_video,
             fps=FPS,
             codec="libx264",
+            threads=4,
+            ffmpeg_params=["-preset", "ultrafast"],
             logger="bar",
         )
 
@@ -264,7 +266,7 @@ def _create_manim_with_background(
     video_path: str, bg_path: str, duration: float
 ):
     pil_bg = Image.open(bg_path).convert("RGB")
-    pil_bg = pil_bg.resize((REEL_WIDTH, REEL_HEIGHT), Image.LANCZOS)
+    pil_bg = pil_bg.resize((REEL_WIDTH, REEL_HEIGHT), Image.BICUBIC)
     # No blurring or massive darkening — keep it cinematic. We dim slightly (85%) for contrast.
     bg_array = (np.array(pil_bg) * 0.85).astype(np.uint8)
 
